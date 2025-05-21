@@ -66,6 +66,22 @@ public class DriverController {
         }
     }
 
+    @Operation(summary = "Получить водителя по ID")
+    @GetMapping("/{id}")
+    public ResponseEntity<DriverResponse> getDriverById(@PathVariable Long id) {
+        try {
+            logger.info("Fetching driver with ID: {}", id);
+            DriverResponse driver = driverService.getDriverById(id);
+            return ResponseEntity.ok(driver);
+        } catch (jakarta.persistence.EntityNotFoundException ex) {
+            logger.error("Driver not found", ex);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        } catch (Exception e) {
+            logger.error("Error fetching driver", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
+    }
+
     @Operation(summary = "Изменение информации о водителе")
     @PutMapping("/{id}")
     public ResponseEntity<DriverResponse> updateDriver(@PathVariable Long id, @RequestBody @Valid DriverRequest request) {

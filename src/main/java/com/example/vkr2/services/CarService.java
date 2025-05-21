@@ -66,6 +66,19 @@ public class CarService {
         }
     }
 
+    @Transactional(readOnly = true)
+    public CarResponse getCarById(Long id) {
+        logger.info("Fetching car with ID: {}", id);
+        try {
+            Car car = carRepository.findById(id)
+                    .orElseThrow(() -> new EntityNotFoundException("Автомобиль с ID " + id + " не найден"));
+            return mapToCarResponse(car);
+        } catch (Exception e) {
+            logger.error("Error fetching car with ID: {}", id, e);
+            throw new RuntimeException("Ошибка при получении автомобиля", e);
+        }
+    }
+
     @Transactional
     public CarResponse updateCar(Long id, Car car) {
         logger.info("Updating car with ID: {}", id);

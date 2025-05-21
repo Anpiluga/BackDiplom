@@ -2,10 +2,16 @@ package com.example.vkr2.JWT.services;
 
 import com.example.vkr2.JWT.models.User;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.UnsupportedJwtException;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import io.jsonwebtoken.security.SignatureException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
@@ -18,6 +24,9 @@ import java.util.function.Function;
 
 @Service
 public class JwtService {
+
+    private static final Logger logger = LoggerFactory.getLogger(JwtService.class);
+
     @Value("${token.signing.key}")
     private String jwtSigningKey;
 
@@ -28,7 +37,12 @@ public class JwtService {
      * @return имя пользователя
      */
     public String extractUserName(String token) {
-        return extractClaim(token, Claims::getSubject);
+        try {
+            return extractClaim(token, Claims::getSubject);
+        } catch (Exception e) {
+            logger.error("Error extracting username from token", e);
+            return null;
+        }
     }
 
     /**
@@ -43,7 +57,10 @@ public class JwtService {
             claims.put("id", customUserDetails.getId());
             claims.put("email", customUserDetails.getEmail());
         }
-        return generateToken(claims, userDetails);
+
+        String token = generateToken(claims, userDetails);
+        logger.debug("Generated token for user: {}", userDetails.getUsername());
+        return token;
     }
 
     /**
@@ -54,8 +71,22 @@ public class JwtService {
      * @return true, если токен валиден
      */
     public boolean isTokenValid(String token, UserDetails userDetails) {
-        final String userName = extractUserName(token);
-        return (userName.equals(userDetails.getUsername())) && !isTokenExpired(token);
+        try {
+            final String userName = extractUserName(token);
+            boolean isValid = (userName != null && userName.equals(userDetails.getUsername())) && !isTokenExpired(token);
+
+            if (!isValid) {
+                logger.warn("Token validation failed for user: {}. Username match: {}, Expired: {}",
+                        userDetails.getUsername(),
+                        userName != null && userName.equals(userDetails.getUsername()),
+                        isTokenExpired(token));
+            }
+
+            return isValid;
+        } catch (Exception e) {
+            logger.error("Error validating token for user: {}", userDetails.getUsername(), e);
+            return false;
+        }
     }
 
     /**
@@ -79,10 +110,16 @@ public class JwtService {
      * @return токен
      */
     private String generateToken(Map<String, Object> extraClaims, UserDetails userDetails) {
-        return Jwts.builder().setClaims(extraClaims).setSubject(userDetails.getUsername())
-                .setIssuedAt(new Date(System.currentTimeMillis()))
-                .setExpiration(new Date(System.currentTimeMillis() + 100000 * 60 * 24))
-                .signWith(getSigningKey(), SignatureAlgorithm.HS256).compact();
+        Date now = new Date();
+        Date expiration = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 часа
+
+        return Jwts.builder()
+                .setClaims(extraClaims)
+                .setSubject(userDetails.getUsername())
+                .setIssuedAt(now)
+                .setExpiration(expiration)
+                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+                .compact();
     }
 
     /**
@@ -92,7 +129,12 @@ public class JwtService {
      * @return true, если токен просрочен
      */
     private boolean isTokenExpired(String token) {
-        return extractExpiration(token).before(new Date());
+        try {
+            return extractExpiration(token).before(new Date());
+        } catch (Exception e) {
+            logger.error("Error checking token expiration", e);
+            return true;
+        }
     }
 
     /**
@@ -112,8 +154,28 @@ public class JwtService {
      * @return данные
      */
     private Claims extractAllClaims(String token) {
-        return Jwts.parser().setSigningKey(getSigningKey()).build().parseClaimsJws(token)
-                .getBody();
+        try {
+            return Jwts.parser()
+                    .setSigningKey(getSigningKey())
+                    .build()
+                    .parseClaimsJws(token)
+                    .getBody();
+        } catch (ExpiredJwtException e) {
+            logger.warn("JWT token is expired: {}", e.getMessage());
+            throw e;
+        } catch (UnsupportedJwtException e) {
+            logger.error("JWT token is unsupported: {}", e.getMessage());
+            throw e;
+        } catch (MalformedJwtException e) {
+            logger.error("JWT token is malformed: {}", e.getMessage());
+            throw e;
+        } catch (SignatureException e) {
+            logger.error("JWT signature validation failed: {}", e.getMessage());
+            throw e;
+        } catch (IllegalArgumentException e) {
+            logger.error("JWT token compact of handler are invalid: {}", e.getMessage());
+            throw e;
+        }
     }
 
     /**

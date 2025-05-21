@@ -36,6 +36,14 @@ public class DriverService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
+    public DriverResponse getDriverById(Long id) {
+        logger.info("Fetching driver with ID: {}", id);
+        Driver driver = driverRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Водитель с ID " + id + " не найден"));
+        return mapToResponse(driver);
+    }
+
     @Transactional
     public DriverResponse updateDriver(Long id, Driver driverDetails) {
         logger.info("Updating driver with ID: {}", id);

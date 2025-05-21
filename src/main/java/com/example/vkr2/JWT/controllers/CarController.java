@@ -71,6 +71,22 @@ public class CarController {
         }
     }
 
+    @Operation(summary = "Получить автомобиль по ID")
+    @GetMapping("/{id}")
+    public ResponseEntity<CarResponse> getCarById(@PathVariable Long id) {
+        logger.info("Fetching car with ID: {}", id);
+        try {
+            CarResponse car = carService.getCarById(id);
+            return ResponseEntity.ok(car);
+        } catch (EntityNotFoundException e) {
+            logger.error("Car not found: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        } catch (Exception e) {
+            logger.error("Unexpected error fetching car: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
+    }
+
     @Operation(summary = "Изменение информации об авто")
     @PutMapping("/{id}")
     public ResponseEntity<CarResponse> updateCar(@PathVariable Long id, @RequestBody @Valid CarRequest request) {
