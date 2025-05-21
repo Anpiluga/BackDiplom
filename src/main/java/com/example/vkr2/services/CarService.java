@@ -1,6 +1,5 @@
 package com.example.vkr2.services;
 
-import com.example.vkr2.DTO.BankOperationResponse;
 import com.example.vkr2.DTO.CarResponse;
 import com.example.vkr2.entity.Car;
 import com.example.vkr2.entity.CounterType;
@@ -15,7 +14,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Random;
 import java.util.stream.Collectors;
 
 @Service
@@ -26,9 +24,6 @@ public class CarService {
 
     private final CarRepository carRepository;
     private final DriverRepository driverRepository;
-    private final BankOperationService bankOperationService;
-
-    private final Random random = new Random();
 
     @Transactional
     public CarResponse addCar(Car car) {
@@ -41,6 +36,11 @@ public class CarService {
             if (carRepository.findByLicensePlate(car.getLicensePlate()).isPresent()) {
                 logger.error("Car with license plate {} already exists", car.getLicensePlate());
                 throw new IllegalArgumentException("Автомобиль с таким госномером уже существует");
+            }
+
+            // Безопасная обработка null значений
+            if (car.getSecondaryCounterEnabled() == null) {
+                car.setSecondaryCounterEnabled(Boolean.FALSE);
             }
 
             Car savedCar = carRepository.save(car);
@@ -63,26 +63,6 @@ public class CarService {
         } catch (Exception e) {
             logger.error("Error fetching all cars", e);
             throw new RuntimeException("Ошибка при получении списка автомобилей: " + e.getMessage(), e);
-        }
-    }
-
-    @Transactional
-    public void ensureBankOperationsExist(List<Long> carIds) {
-        logger.info("Ensuring bank operations exist for {} cars", carIds.size());
-        for (Long carId : carIds) {
-            try {
-                List<BankOperationResponse> operations = bankOperationService.getBankOperationsByCarId(carId);
-                if (operations.isEmpty()) {
-                    logger.info("No bank operations found for car ID: {}. Generating random operations.", carId);
-                    int operationCount = random.nextInt(3) + 3;
-                    bankOperationService.generateRandomBankOperations(carId, operationCount);
-                    logger.info("Generated {} random bank operations for car ID: {}", operationCount, carId);
-                } else {
-                    logger.info("Found {} existing operations for car ID: {}", operations.size(), carId);
-                }
-            } catch (Exception e) {
-                logger.error("Error processing bank operations for car ID: {}", carId, e);
-            }
         }
     }
 
@@ -112,7 +92,12 @@ public class CarService {
             existingCar.setFuelConsumption(car.getFuelConsumption());
             existingCar.setStatus(car.getStatus());
             existingCar.setCounterType(car.getCounterType() != null ? car.getCounterType() : CounterType.ODOMETER);
-            existingCar.setSecondaryCounterEnabled(car.isSecondaryCounterEnabled());
+
+            // Безопасная обработка null значений
+            existingCar.setSecondaryCounterEnabled(car.getSecondaryCounterEnabled() != null
+                    ? car.getSecondaryCounterEnabled()
+                    : Boolean.FALSE);
+
             existingCar.setFuelTankVolume(car.getFuelTankVolume());
             existingCar.setFuelType(car.getFuelType());
             existingCar.setDescription(car.getDescription());
@@ -213,8 +198,11 @@ public class CarService {
             response.setCounterType(CounterType.ODOMETER); // Значение по умолчанию
         }
 
-        // Нет необходимости в проверке boolean, но для единообразия
-        response.setSecondaryCounterEnabled(car.isSecondaryCounterEnabled());
+        // Безопасная обработка secondaryCounterEnabled
+        response.setSecondaryCounterEnabled(car.getSecondaryCounterEnabled() != null
+                ? car.getSecondaryCounterEnabled()
+                : Boolean.FALSE);
+
         response.setFuelTankVolume(car.getFuelTankVolume());
         response.setFuelType(car.getFuelType());
         response.setDescription(car.getDescription());

@@ -1,14 +1,11 @@
 package com.example.vkr2.DTO;
 
-import com.example.vkr2.entity.Car; // Добавляем импорт
 import com.example.vkr2.entity.CarStatus;
 import com.example.vkr2.entity.CounterType;
 import com.example.vkr2.entity.FuelEntry;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 import lombok.Data;
-
-import java.time.LocalDate;
 
 @Data
 @Schema(description = "Запрос для создания или обновления автомобиля")
@@ -53,12 +50,10 @@ public class CarRequest {
 
     // Новые поля
     @Schema(description = "Тип счётчика", example = "ODOMETER")
-    @NotNull(message = "Тип счётчика не может быть пустым")
-    private CounterType counterType;
+    private CounterType counterType = CounterType.ODOMETER; // Установим значение по умолчанию
 
     @Schema(description = "Включён ли второй счётчик", example = "false")
-    @NotNull(message = "Поле включения второго счётчика не может быть пустым")
-    private Boolean secondaryCounterEnabled;
+    private Boolean secondaryCounterEnabled = Boolean.FALSE; // Используем объектный тип Boolean
 
     @Schema(description = "Объём топливного бака (л)", example = "50.0")
     private Double fuelTankVolume;
@@ -69,4 +64,9 @@ public class CarRequest {
     @Schema(description = "Описание автомобиля", example = "Седан в отличном состоянии")
     @Size(max = 1000, message = "Описание не может превышать 1000 символов")
     private String description;
+
+    // Добавляем метод с префиксом is для совместимости с существующим кодом
+    public boolean isSecondaryCounterEnabled() {
+        return secondaryCounterEnabled != null ? secondaryCounterEnabled : Boolean.FALSE;
+    }
 }

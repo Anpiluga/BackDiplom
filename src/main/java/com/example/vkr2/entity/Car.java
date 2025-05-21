@@ -1,6 +1,5 @@
 package com.example.vkr2.entity;
 
-import com.example.vkr2.entity.CarStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -50,13 +49,12 @@ public class Car {
     @JoinColumn(name = "driver_id", unique = true)
     private Driver driver;
 
-    // Изменено: удалено ограничение nullable=false и добавлен Transient для обхода проблемы
     @Enumerated(EnumType.STRING)
     @Column(name = "counter_type")
     private CounterType counterType = CounterType.ODOMETER; // По умолчанию одометр
 
     @Column(name = "secondary_counter_enabled")
-    private boolean secondaryCounterEnabled = false; // По умолчанию выключен
+    private Boolean secondaryCounterEnabled = Boolean.FALSE; // Используем объектный тип Boolean
 
     @Column
     private Double fuelTankVolume;
@@ -67,4 +65,14 @@ public class Car {
 
     @Column(length = 1000)
     private String description;
+
+    // Добавляем метод с префиксом is для совместимости с существующим кодом
+    public boolean isSecondaryCounterEnabled() {
+        return secondaryCounterEnabled != null ? secondaryCounterEnabled : Boolean.FALSE;
+    }
+
+    // Добавляем сеттер для правильной работы с null значениями
+    public void setSecondaryCounterEnabled(Boolean secondaryCounterEnabled) {
+        this.secondaryCounterEnabled = secondaryCounterEnabled != null ? secondaryCounterEnabled : Boolean.FALSE;
+    }
 }

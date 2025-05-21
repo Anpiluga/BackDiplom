@@ -1,13 +1,10 @@
 package com.example.vkr2.DTO;
 
-import com.example.vkr2.entity.Car; // Добавляем импорт
 import com.example.vkr2.entity.CarStatus;
 import com.example.vkr2.entity.CounterType;
 import com.example.vkr2.entity.FuelEntry;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
-
-import java.time.LocalDate;
 
 @Data
 @Schema(description = "Ответ с данными об автомобиле")
@@ -50,7 +47,7 @@ public class CarResponse {
     private CounterType counterType;
 
     @Schema(description = "Включён ли второй счётчик", example = "false")
-    private Boolean secondaryCounterEnabled;
+    private Boolean secondaryCounterEnabled = Boolean.FALSE;
 
     @Schema(description = "Объём топливного бака (л)", example = "50.0")
     private Double fuelTankVolume;
@@ -60,4 +57,9 @@ public class CarResponse {
 
     @Schema(description = "Описание автомобиля", example = "Седан в отличном состоянии")
     private String description;
+
+    // Добавляем метод с префиксом is для совместимости с существующим кодом
+    public boolean isSecondaryCounterEnabled() {
+        return secondaryCounterEnabled != null ? secondaryCounterEnabled : Boolean.FALSE;
+    }
 }

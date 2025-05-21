@@ -17,7 +17,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Collections;
 
 @RestController
 @RequestMapping("/admin/cars")
@@ -49,15 +48,6 @@ public class CarController {
                     .description(request.getDescription())
                     .build();
             CarResponse savedCar = carService.addCar(car);
-
-            // После добавления авто и основной логики, генерируем банковские операции
-            try {
-                carService.ensureBankOperationsExist(Collections.singletonList(savedCar.getId()));
-            } catch (Exception ex) {
-                // Игнорируем ошибки при генерации банковских операций
-                logger.warn("Failed to generate bank operations, but the car was created successfully", ex);
-            }
-
             return ResponseEntity.status(HttpStatus.CREATED).body(savedCar);
         } catch (IllegalArgumentException e) {
             logger.error("Error adding car: {}", e.getMessage());
@@ -74,16 +64,6 @@ public class CarController {
         logger.info("Fetching all cars");
         try {
             List<CarResponse> cars = carService.getAllCars();
-
-            // После получения списка авто, запускаем отдельный процесс для генерации банковских операций
-            try {
-                List<Long> carIds = cars.stream().map(CarResponse::getId).toList();
-                carService.ensureBankOperationsExist(carIds);
-            } catch (Exception ex) {
-                // Игнорируем ошибки при генерации банковских операций
-                logger.warn("Failed to generate bank operations, but returning car list anyway", ex);
-            }
-
             return ResponseEntity.ok(cars);
         } catch (Exception e) {
             logger.error("Error fetching cars: {}", e.getMessage(), e);
