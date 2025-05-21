@@ -8,6 +8,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,59 +22,95 @@ import java.util.List;
 @Tag(name = "Управление водителями")
 public class DriverController {
 
+    private static final Logger logger = LoggerFactory.getLogger(DriverController.class);
     private final DriverService driverService;
 
     @Operation(summary = "Добавить водителя")
     @PostMapping
     public ResponseEntity<DriverResponse> addDriver(@RequestBody @Valid DriverRequest request) {
-        System.out.println("Adding driver: " + request);
-        Driver driver = new Driver();
-        driver.setFullName(request.getFullName());
-        driver.setPhoneNumber(request.getPhoneNumber());
-        DriverResponse savedDriver = driverService.addDriver(driver);
-        return ResponseEntity.status(HttpStatus.CREATED).body(savedDriver);
+        try {
+            logger.info("Adding driver: {}", request);
+            Driver driver = new Driver();
+            // Объединяем поля firstName, lastName и middleName в одно поле fullName
+            StringBuilder fullNameBuilder = new StringBuilder();
+            if (request.getFirstName() != null && !request.getFirstName().isEmpty()) {
+                fullNameBuilder.append(request.getFirstName()).append(" ");
+            }
+            if (request.getLastName() != null && !request.getLastName().isEmpty()) {
+                fullNameBuilder.append(request.getLastName()).append(" ");
+            }
+            if (request.getMiddleName() != null && !request.getMiddleName().isEmpty()) {
+                fullNameBuilder.append(request.getMiddleName());
+            }
+
+            driver.setFullName(fullNameBuilder.toString().trim());
+            driver.setPhoneNumber(request.getPhoneNumber());
+            DriverResponse savedDriver = driverService.addDriver(driver);
+            return ResponseEntity.status(HttpStatus.CREATED).body(savedDriver);
+        } catch (Exception e) {
+            logger.error("Error adding driver", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
     }
 
     @Operation(summary = "Получить всех водителей")
     @GetMapping
     public ResponseEntity<List<DriverResponse>> getAllDrivers() {
-        System.out.println("Fetching all drivers");
-        List<DriverResponse> drivers = driverService.getAllDrivers();
-        return ResponseEntity.ok(drivers);
+        try {
+            logger.info("Fetching all drivers");
+            List<DriverResponse> drivers = driverService.getAllDrivers();
+            return ResponseEntity.ok(drivers);
+        } catch (Exception e) {
+            logger.error("Error fetching drivers", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
     }
 
     @Operation(summary = "Изменение информации о водителе")
     @PutMapping("/{id}")
     public ResponseEntity<DriverResponse> updateDriver(@PathVariable Long id, @RequestBody @Valid DriverRequest request) {
-        System.out.println("Updating driver with ID: " + id);
-        Driver driver = new Driver();
-        driver.setFullName(request.getFullName());
-        driver.setPhoneNumber(request.getPhoneNumber());
-        DriverResponse updatedDriver = driverService.updateDriver(id, driver);
-        return ResponseEntity.ok(updatedDriver);
+        try {
+            logger.info("Updating driver with ID: {}", id);
+            Driver driver = new Driver();
+
+            // Объединяем поля в fullName
+            StringBuilder fullNameBuilder = new StringBuilder();
+            if (request.getFirstName() != null && !request.getFirstName().isEmpty()) {
+                fullNameBuilder.append(request.getFirstName()).append(" ");
+            }
+            if (request.getLastName() != null && !request.getLastName().isEmpty()) {
+                fullNameBuilder.append(request.getLastName()).append(" ");
+            }
+            if (request.getMiddleName() != null && !request.getMiddleName().isEmpty()) {
+                fullNameBuilder.append(request.getMiddleName());
+            }
+
+            driver.setFullName(fullNameBuilder.toString().trim());
+            driver.setPhoneNumber(request.getPhoneNumber());
+            DriverResponse updatedDriver = driverService.updateDriver(id, driver);
+            return ResponseEntity.ok(updatedDriver);
+        } catch (jakarta.persistence.EntityNotFoundException ex) {
+            logger.error("Driver not found", ex);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        } catch (Exception e) {
+            logger.error("Error updating driver", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
     }
 
     @Operation(summary = "Удаление водителя")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteDriver(@PathVariable Long id) {
-        System.out.println("Deleting driver with ID: " + id);
-        driverService.deleteDriver(id);
-        return ResponseEntity.noContent().build();
-    }
-
-    @ExceptionHandler({jakarta.persistence.EntityNotFoundException.class})
-    public ResponseEntity<String> handleEntityNotFoundException(jakarta.persistence.EntityNotFoundException ex) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Водитель с указанным ID не найден: " + ex.getMessage());
-    }
-
-    @ExceptionHandler({IllegalArgumentException.class})
-    public ResponseEntity<String> handleIllegalArgumentException(IllegalArgumentException ex) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Некорректные данные: " + ex.getMessage());
-    }
-
-    @ExceptionHandler({Exception.class})
-    public ResponseEntity<String> handleGeneralException(Exception ex) {
-        ex.printStackTrace();
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Произошла ошибка сервера: " + ex.getMessage());
+        try {
+            logger.info("Deleting driver with ID: {}", id);
+            driverService.deleteDriver(id);
+            return ResponseEntity.noContent().build();
+        } catch (jakarta.persistence.EntityNotFoundException ex) {
+            logger.error("Driver not found", ex);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        } catch (Exception e) {
+            logger.error("Error deleting driver", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 }

@@ -50,12 +50,12 @@ public class Car {
     @JoinColumn(name = "driver_id", unique = true)
     private Driver driver;
 
-    // Новые поля
+    // Изменено: удалено ограничение nullable=false и добавлен Transient для обхода проблемы
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private CounterType counterType; // По умолчанию одометр
+    @Column(name = "counter_type")
+    private CounterType counterType = CounterType.ODOMETER; // По умолчанию одометр
 
-    @Column(nullable = false)
+    @Column(name = "secondary_counter_enabled")
     private boolean secondaryCounterEnabled = false; // По умолчанию выключен
 
     @Column

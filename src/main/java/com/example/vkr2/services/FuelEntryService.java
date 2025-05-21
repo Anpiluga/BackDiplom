@@ -104,7 +104,14 @@ public class FuelEntryService {
     private FuelEntryResponse mapToResponse(FuelEntry entry) {
         FuelEntryResponse response = new FuelEntryResponse();
         response.setId(entry.getId());
-        response.setCarDetails(entry.getCar().getBrand() + " " + entry.getCar().getModel());
+
+        // Добавляем проверку на null
+        if (entry.getCar() != null) {
+            response.setCarDetails(entry.getCar().getBrand() + " " + entry.getCar().getModel());
+        } else {
+            response.setCarDetails("Неизвестный автомобиль");
+        }
+
         response.setOdometerReading(entry.getOdometerReading());
         response.setGasStation(entry.getGasStation());
         response.setFuelType(entry.getFuelType());

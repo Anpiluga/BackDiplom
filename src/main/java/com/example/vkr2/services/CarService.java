@@ -45,16 +45,6 @@ public class CarService {
 
             Car savedCar = carRepository.save(car);
             logger.info("Car saved with ID: {}", savedCar.getId());
-
-            try {
-                int operationCount = random.nextInt(3) + 3;
-                logger.info("Generating {} random bank operations for car ID: {}", operationCount, savedCar.getId());
-                bankOperationService.generateRandomBankOperations(savedCar.getId(), operationCount);
-                logger.info("Random bank operations generated for car ID: {}", savedCar.getId());
-            } catch (Exception e) {
-                logger.error("Failed to generate random bank operations for car ID: {}", savedCar.getId(), e);
-            }
-
             return mapToCarResponse(savedCar);
         } catch (Exception e) {
             logger.error("Error adding car with VIN: {}", car.getVin(), e);
@@ -67,27 +57,32 @@ public class CarService {
         logger.info("Fetching all cars");
         try {
             List<Car> cars = carRepository.findAll();
-            for (Car car : cars) {
-                try {
-                    List<BankOperationResponse> operations = bankOperationService.getBankOperationsByCarId(car.getId());
-                    if (operations.isEmpty()) {
-                        logger.info("No bank operations found for car ID: {}. Generating random operations.", car.getId());
-                        bankOperationService.generateRandomBankOperations(car.getId(), random.nextInt(3) + 3);
-                        List<BankOperationResponse> newOperations = bankOperationService.getBankOperationsByCarId(car.getId());
-                        logger.info("After generation, found {} operations for car ID: {}", newOperations.size(), car.getId());
-                    } else {
-                        logger.info("Found {} existing operations for car ID: {}", operations.size(), car.getId());
-                    }
-                } catch (Exception e) {
-                    logger.error("Error processing bank operations for car ID: {}", car.getId(), e);
-                }
-            }
             return cars.stream()
                     .map(this::mapToCarResponse)
                     .collect(Collectors.toList());
         } catch (Exception e) {
             logger.error("Error fetching all cars", e);
             throw new RuntimeException("Ошибка при получении списка автомобилей: " + e.getMessage(), e);
+        }
+    }
+
+    @Transactional
+    public void ensureBankOperationsExist(List<Long> carIds) {
+        logger.info("Ensuring bank operations exist for {} cars", carIds.size());
+        for (Long carId : carIds) {
+            try {
+                List<BankOperationResponse> operations = bankOperationService.getBankOperationsByCarId(carId);
+                if (operations.isEmpty()) {
+                    logger.info("No bank operations found for car ID: {}. Generating random operations.", carId);
+                    int operationCount = random.nextInt(3) + 3;
+                    bankOperationService.generateRandomBankOperations(carId, operationCount);
+                    logger.info("Generated {} random bank operations for car ID: {}", operationCount, carId);
+                } else {
+                    logger.info("Found {} existing operations for car ID: {}", operations.size(), carId);
+                }
+            } catch (Exception e) {
+                logger.error("Error processing bank operations for car ID: {}", carId, e);
+            }
         }
     }
 
@@ -198,6 +193,7 @@ public class CarService {
         }
     }
 
+    // Обновленная функция mapToCarResponse в CarService
     private CarResponse mapToCarResponse(Car car) {
         CarResponse response = new CarResponse();
         response.setId(car.getId());
@@ -209,15 +205,25 @@ public class CarService {
         response.setOdometr(car.getOdometr());
         response.setFuelConsumption(car.getFuelConsumption());
         response.setStatus(car.getStatus());
-        response.setCounterType(car.getCounterType() != null ? car.getCounterType() : CounterType.ODOMETER);
+
+        // Безопасная обработка counterType
+        if (car.getCounterType() != null) {
+            response.setCounterType(car.getCounterType());
+        } else {
+            response.setCounterType(CounterType.ODOMETER); // Значение по умолчанию
+        }
+
+        // Нет необходимости в проверке boolean, но для единообразия
         response.setSecondaryCounterEnabled(car.isSecondaryCounterEnabled());
         response.setFuelTankVolume(car.getFuelTankVolume());
         response.setFuelType(car.getFuelType());
         response.setDescription(car.getDescription());
+
         if (car.getDriver() != null) {
             response.setDriverId(car.getDriver().getId());
             response.setDriverFullName(car.getDriver().getFullName());
         }
+
         return response;
     }
 }
