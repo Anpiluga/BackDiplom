@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -80,6 +81,23 @@ public class FuelEntryService {
         } catch (Exception e) {
             logger.error("Error fetching fuel entries", e);
             throw new RuntimeException("Ошибка при получении записей о заправках", e);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public List<FuelEntryResponse> getFuelEntriesWithFilters(String search, String gasStation,
+                                                             FuelEntry.FuelType fuelType, Double minCost,
+                                                             Double maxCost, LocalDateTime startDate,
+                                                             LocalDateTime endDate) {
+        logger.info("Fetching fuel entries with filters");
+        try {
+            return fuelEntryRepository.findFuelEntriesWithFilters(search, gasStation, fuelType,
+                            minCost, maxCost, startDate, endDate).stream()
+                    .map(this::mapToResponse)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            logger.error("Error fetching filtered fuel entries", e);
+            throw new RuntimeException("Ошибка при получении отфильтрованных записей о заправках", e);
         }
     }
 

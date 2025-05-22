@@ -1,6 +1,5 @@
 package com.example.vkr2.services;
 
-import com.example.vkr2.DTO.DriverRequest;
 import com.example.vkr2.DTO.DriverResponse;
 import com.example.vkr2.entity.Driver;
 import com.example.vkr2.repository.DriverRepository;
@@ -32,6 +31,14 @@ public class DriverService {
     public List<DriverResponse> getAllDrivers() {
         logger.info("Fetching all drivers");
         return driverRepository.findAll().stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<DriverResponse> getDriversWithCarFilter(Boolean hasCar) {
+        logger.info("Fetching drivers with car filter: {}", hasCar);
+        return driverRepository.findDriversWithCarFilter(hasCar).stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }

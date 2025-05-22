@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -37,6 +38,7 @@ public class SparePartService {
                 .unit(request.getUnit())
                 .totalSum(totalSum)
                 .description(request.getDescription())
+                .dateAdded(request.getDateAdded())
                 .build();
 
         SparePart savedPart = sparePartRepository.save(sparePart);
@@ -60,6 +62,7 @@ public class SparePartService {
         existingPart.setUnit(request.getUnit());
         existingPart.setTotalSum(totalSum);
         existingPart.setDescription(request.getDescription());
+        existingPart.setDateAdded(request.getDateAdded());
 
         SparePart updatedPart = sparePartRepository.save(existingPart);
         logger.info("Spare part updated with ID: {}", updatedPart.getId());
@@ -113,6 +116,14 @@ public class SparePartService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
+    public List<SparePartResponse> getSparePartsByDateRange(LocalDateTime startDate, LocalDateTime endDate) {
+        logger.info("Fetching spare parts by date range: {} to {}", startDate, endDate);
+        return sparePartRepository.findByDateAddedBetween(startDate, endDate).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
     private SparePartResponse mapToResponse(SparePart part) {
         SparePartResponse response = new SparePartResponse();
         response.setId(part.getId());
@@ -124,6 +135,7 @@ public class SparePartService {
         response.setUnit(part.getUnit());
         response.setTotalSum(part.getTotalSum());
         response.setDescription(part.getDescription());
+        response.setDateAdded(part.getDateAdded());
         return response;
     }
 }

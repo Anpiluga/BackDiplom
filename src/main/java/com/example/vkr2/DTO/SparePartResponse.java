@@ -4,6 +4,8 @@ import com.example.vkr2.entity.SparePart;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
+import java.time.LocalDateTime;
+
 @Data
 @Schema(description = "Ответ с данными о запчасти")
 public class SparePartResponse {
@@ -34,4 +36,7 @@ public class SparePartResponse {
 
     @Schema(description = "Описание", example = "Фильтр для замены масла")
     private String description;
+
+    @Schema(description = "Дата добавления", example = "2025-05-20T14:30:00")
+    private LocalDateTime dateAdded;
 }

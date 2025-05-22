@@ -66,6 +66,20 @@ public class DriverController {
         }
     }
 
+    @Operation(summary = "Получить водителей с фильтром по наличию автомобиля")
+    @GetMapping("/filter")
+    public ResponseEntity<List<DriverResponse>> getDriversWithCarFilter(
+            @RequestParam(required = false) Boolean hasCar) {
+        try {
+            logger.info("Fetching drivers with car filter: {}", hasCar);
+            List<DriverResponse> drivers = driverService.getDriversWithCarFilter(hasCar);
+            return ResponseEntity.ok(drivers);
+        } catch (Exception e) {
+            logger.error("Error fetching drivers with filter", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
+    }
+
     @Operation(summary = "Получить водителя по ID")
     @GetMapping("/{id}")
     public ResponseEntity<DriverResponse> getDriverById(@PathVariable Long id) {

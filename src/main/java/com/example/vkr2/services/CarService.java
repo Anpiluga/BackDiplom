@@ -2,6 +2,7 @@ package com.example.vkr2.services;
 
 import com.example.vkr2.DTO.CarResponse;
 import com.example.vkr2.entity.Car;
+import com.example.vkr2.entity.CarStatus;
 import com.example.vkr2.entity.CounterType;
 import com.example.vkr2.entity.Driver;
 import com.example.vkr2.repository.CarRepository;
@@ -63,6 +64,21 @@ public class CarService {
         } catch (Exception e) {
             logger.error("Error fetching all cars", e);
             throw new RuntimeException("Ошибка при получении списка автомобилей: " + e.getMessage(), e);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public List<CarResponse> getCarsWithFilters(String search, CarStatus status, Integer yearFrom, Integer yearTo) {
+        logger.info("Fetching cars with filters - search: {}, status: {}, yearFrom: {}, yearTo: {}",
+                search, status, yearFrom, yearTo);
+        try {
+            List<Car> cars = carRepository.findCarsWithFilters(search, status, yearFrom, yearTo);
+            return cars.stream()
+                    .map(this::mapToCarResponse)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            logger.error("Error fetching cars with filters", e);
+            throw new RuntimeException("Ошибка при получении отфильтрованного списка автомобилей", e);
         }
     }
 

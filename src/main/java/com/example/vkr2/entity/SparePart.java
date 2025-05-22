@@ -3,6 +3,8 @@ package com.example.vkr2.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDateTime;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -40,6 +42,9 @@ public class SparePart {
 
     @Column(length = 1000)
     private String description;
+
+    @Column(nullable = false)
+    private LocalDateTime dateAdded;
 
     public enum Category {
         CONSUMABLES("Расходники"),

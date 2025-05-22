@@ -12,7 +12,6 @@ import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -30,36 +29,33 @@ public class AnalyticsService {
     public Map<String, Object> getTotalExpenses(LocalDateTime startDate, LocalDateTime endDate) {
         logger.info("Calculating total expenses from {} to {}", startDate, endDate);
 
-        if (startDate == null) {
-            startDate = LocalDateTime.now().minusMonths(3);
-        }
-        if (endDate == null) {
-            endDate = LocalDateTime.now();
-        }
+        // Создаем final переменные для использования в lambda
+        final LocalDateTime finalStartDate = startDate != null ? startDate : LocalDateTime.now().minusMonths(3);
+        final LocalDateTime finalEndDate = endDate != null ? endDate : LocalDateTime.now();
 
         Map<String, Object> result = new HashMap<>();
 
         // Расходы на топливо
         double fuelCosts = fuelEntryRepository.findAll().stream()
-                .filter(entry -> entry.getDateTime().isAfter(startDate) && entry.getDateTime().isBefore(endDate))
+                .filter(entry -> entry.getDateTime().isAfter(finalStartDate) && entry.getDateTime().isBefore(finalEndDate))
                 .mapToDouble(entry -> entry.getTotalCost())
                 .sum();
 
         // Дополнительные расходы
-        double additionalCosts = additionalExpenseRepository.findByDateTimeBetween(startDate, endDate).stream()
+        double additionalCosts = additionalExpenseRepository.findByDateTimeBetween(finalStartDate, finalEndDate).stream()
                 .mapToDouble(expense -> expense.getPrice())
                 .sum();
 
         // Расходы на сервис
         double serviceCosts = serviceRecordRepository.findAll().stream()
-                .filter(record -> record.getStartDate().atStartOfDay().isAfter(startDate) &&
-                        record.getStartDate().atStartOfDay().isBefore(endDate))
+                .filter(record -> record.getStartDate().atStartOfDay().isAfter(finalStartDate) &&
+                        record.getStartDate().atStartOfDay().isBefore(finalEndDate))
                 .filter(record -> record.getTotalCost() != null)
                 .mapToDouble(record -> record.getTotalCost())
                 .sum();
 
-        // Расходы на запчасти (общая стоимость всех запчастей на складе)
-        double sparePartsCosts = sparePartRepository.findAll().stream()
+        // Расходы на запчасти по датам добавления
+        double sparePartsCosts = sparePartRepository.findByDateAddedBetween(finalStartDate, finalEndDate).stream()
                 .mapToDouble(part -> part.getTotalSum())
                 .sum();
 
@@ -91,46 +87,38 @@ public class AnalyticsService {
     public Map<String, Object> getCarExpenses(Long carId, LocalDateTime startDate, LocalDateTime endDate) {
         logger.info("Calculating expenses for car ID: {} from {} to {}", carId, startDate, endDate);
 
-        if (startDate == null) {
-            startDate = LocalDateTime.now().minusMonths(3);
-        }
-        if (endDate == null) {
-            endDate = LocalDateTime.now();
-        }
+        // Создаем final переменные для использования в lambda
+        final LocalDateTime finalStartDate = startDate != null ? startDate : LocalDateTime.now().minusMonths(3);
+        final LocalDateTime finalEndDate = endDate != null ? endDate : LocalDateTime.now();
 
         Map<String, Object> result = new HashMap<>();
 
         // Расходы на топливо для конкретного автомобиля
         double fuelCosts = fuelEntryRepository.findByCarId(carId).stream()
-                .filter(entry -> entry.getDateTime().isAfter(startDate) && entry.getDateTime().isBefore(endDate))
+                .filter(entry -> entry.getDateTime().isAfter(finalStartDate) && entry.getDateTime().isBefore(finalEndDate))
                 .mapToDouble(entry -> entry.getTotalCost())
                 .sum();
 
         // Дополнительные расходы для конкретного автомобиля
-        double additionalCosts = additionalExpenseRepository.findByCarIdAndDateTimeBetween(carId, startDate, endDate).stream()
+        double additionalCosts = additionalExpenseRepository.findByCarIdAndDateTimeBetween(carId, finalStartDate, finalEndDate).stream()
                 .mapToDouble(expense -> expense.getPrice())
                 .sum();
 
         // Расходы на сервис для конкретного автомобиля
         double serviceCosts = serviceRecordRepository.findByCarId(carId).stream()
-                .filter(record -> record.getStartDate().atStartOfDay().isAfter(startDate) &&
-                        record.getStartDate().atStartOfDay().isBefore(endDate))
+                .filter(record -> record.getStartDate().atStartOfDay().isAfter(finalStartDate) &&
+                        record.getStartDate().atStartOfDay().isBefore(finalEndDate))
                 .filter(record -> record.getTotalCost() != null)
                 .mapToDouble(record -> record.getTotalCost())
                 .sum();
 
-        // Для запчастей пока используем общую сумму (можно доработать с привязкой к автомобилю)
-        double sparePartsCosts = sparePartRepository.findAll().stream()
-                .mapToDouble(part -> part.getTotalSum())
-                .sum() / carRepository.count(); // Примерное разделение между автомобилями
-
-        double totalCosts = fuelCosts + additionalCosts + serviceCosts + sparePartsCosts;
+        // НЕ УЧИТЫВАЕМ запчасти для расходов по автомобилю
+        double totalCosts = fuelCosts + additionalCosts + serviceCosts;
 
         result.put("carId", carId);
         result.put("fuelCosts", fuelCosts);
         result.put("additionalCosts", additionalCosts);
         result.put("serviceCosts", serviceCosts);
-        result.put("sparePartsCosts", sparePartsCosts);
         result.put("totalCosts", totalCosts);
 
         // Процентное соотношение
@@ -138,12 +126,10 @@ public class AnalyticsService {
             result.put("fuelPercentage", (fuelCosts / totalCosts) * 100);
             result.put("additionalPercentage", (additionalCosts / totalCosts) * 100);
             result.put("servicePercentage", (serviceCosts / totalCosts) * 100);
-            result.put("sparePartsPercentage", (sparePartsCosts / totalCosts) * 100);
         } else {
             result.put("fuelPercentage", 0);
             result.put("additionalPercentage", 0);
             result.put("servicePercentage", 0);
-            result.put("sparePartsPercentage", 0);
         }
 
         return result;
@@ -166,8 +152,8 @@ public class AnalyticsService {
 
         for (int i = monthsBack - 1; i >= 0; i--) {
             YearMonth month = currentMonth.minusMonths(i);
-            LocalDateTime startOfMonth = month.atDay(1).atStartOfDay();
-            LocalDateTime endOfMonth = month.atEndOfMonth().atTime(23, 59, 59);
+            final LocalDateTime startOfMonth = month.atDay(1).atStartOfDay();
+            final LocalDateTime endOfMonth = month.atEndOfMonth().atTime(23, 59, 59);
 
             months.add(month.format(formatter));
 
@@ -177,7 +163,7 @@ public class AnalyticsService {
             double sparePartsCost = 0;
 
             if (carId != null) {
-                // Расходы для конкретного автомобиля
+                // Расходы для конкретного автомобиля (БЕЗ запчастей)
                 fuelCost = fuelEntryRepository.findByCarId(carId).stream()
                         .filter(entry -> entry.getDateTime().isAfter(startOfMonth) && entry.getDateTime().isBefore(endOfMonth))
                         .mapToDouble(entry -> entry.getTotalCost())
@@ -194,9 +180,8 @@ public class AnalyticsService {
                         .mapToDouble(record -> record.getTotalCost())
                         .sum();
 
-                sparePartsCost = sparePartRepository.findAll().stream()
-                        .mapToDouble(part -> part.getTotalSum())
-                        .sum() / carRepository.count() / monthsBack;
+                // НЕ учитываем запчасти для конкретного автомобиля
+                sparePartsCost = 0;
             } else {
                 // Общие расходы по всем автомобилям
                 fuelCost = fuelEntryRepository.findAll().stream()
@@ -215,9 +200,10 @@ public class AnalyticsService {
                         .mapToDouble(record -> record.getTotalCost())
                         .sum();
 
-                sparePartsCost = sparePartRepository.findAll().stream()
+                // Запчасти по датам добавления
+                sparePartsCost = sparePartRepository.findByDateAddedBetween(startOfMonth, endOfMonth).stream()
                         .mapToDouble(part -> part.getTotalSum())
-                        .sum() / monthsBack;
+                        .sum();
             }
 
             fuelExpenses.add(fuelCost);

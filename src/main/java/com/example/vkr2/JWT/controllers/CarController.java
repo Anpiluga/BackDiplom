@@ -4,6 +4,7 @@ import com.example.vkr2.DTO.AssignDriverRequest;
 import com.example.vkr2.DTO.CarRequest;
 import com.example.vkr2.DTO.CarResponse;
 import com.example.vkr2.entity.Car;
+import com.example.vkr2.entity.CarStatus;
 import com.example.vkr2.services.CarService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -67,6 +68,24 @@ public class CarController {
             return ResponseEntity.ok(cars);
         } catch (Exception e) {
             logger.error("Error fetching cars: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
+    }
+
+    @Operation(summary = "Получить автомобили с фильтрами")
+    @GetMapping("/filter")
+    public ResponseEntity<List<CarResponse>> getCarsWithFilters(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) CarStatus status,
+            @RequestParam(required = false) Integer yearFrom,
+            @RequestParam(required = false) Integer yearTo) {
+        logger.info("Fetching cars with filters - search: {}, status: {}, yearFrom: {}, yearTo: {}",
+                search, status, yearFrom, yearTo);
+        try {
+            List<CarResponse> cars = carService.getCarsWithFilters(search, status, yearFrom, yearTo);
+            return ResponseEntity.ok(cars);
+        } catch (Exception e) {
+            logger.error("Error fetching cars with filters: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
@@ -172,7 +191,7 @@ public class CarController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
         } catch (Exception e) {
             logger.error("Unexpected error unassigning driver: {}", e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 }

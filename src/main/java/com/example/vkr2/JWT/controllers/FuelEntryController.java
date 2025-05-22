@@ -2,6 +2,7 @@ package com.example.vkr2.JWT.controllers;
 
 import com.example.vkr2.DTO.FuelEntryRequest;
 import com.example.vkr2.DTO.FuelEntryResponse;
+import com.example.vkr2.entity.FuelEntry;
 import com.example.vkr2.services.FuelEntryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -10,10 +11,12 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Collections;
 
@@ -68,6 +71,27 @@ public class FuelEntryController {
         } catch (Exception e) {
             logger.error("Ошибка при получении списка заправок: {}", e.getMessage(), e);
             // Возвращаем пустой список вместо null, чтобы избежать ошибок на фронтенде
+            return ResponseEntity.ok(Collections.emptyList());
+        }
+    }
+
+    @Operation(summary = "Получить заправки с фильтрами")
+    @GetMapping("/filter")
+    public ResponseEntity<List<FuelEntryResponse>> getFuelEntriesWithFilters(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String gasStation,
+            @RequestParam(required = false) FuelEntry.FuelType fuelType,
+            @RequestParam(required = false) Double minCost,
+            @RequestParam(required = false) Double maxCost,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate) {
+        try {
+            logger.info("Получение заправок с фильтрами");
+            List<FuelEntryResponse> entries = fuelEntryService.getFuelEntriesWithFilters(
+                    search, gasStation, fuelType, minCost, maxCost, startDate, endDate);
+            return ResponseEntity.ok(entries);
+        } catch (Exception e) {
+            logger.error("Ошибка при получении отфильтрованного списка заправок: {}", e.getMessage(), e);
             return ResponseEntity.ok(Collections.emptyList());
         }
     }

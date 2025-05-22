@@ -5,6 +5,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 import lombok.Data;
 
+import java.time.LocalDateTime;
+
 @Data
 @Schema(description = "Запрос для создания или обновления запчасти")
 public class SparePartRequest {
@@ -38,4 +40,8 @@ public class SparePartRequest {
     @Schema(description = "Описание", example = "Фильтр для замены масла")
     @Size(max = 1000, message = "Описание не может превышать 1000 символов")
     private String description;
+
+    @Schema(description = "Дата добавления", example = "2025-05-20T14:30:00")
+    @NotNull(message = "Дата добавления не может быть пустой")
+    private LocalDateTime dateAdded;
 }
