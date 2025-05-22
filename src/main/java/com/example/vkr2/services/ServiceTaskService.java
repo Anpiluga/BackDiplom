@@ -74,6 +74,19 @@ public class ServiceTaskService {
     }
 
     @Transactional(readOnly = true)
+    public List<ServiceTaskResponse> getServiceTasksWithFilters(String search, Long serviceRecordId) {
+        logger.info("Fetching service tasks with filters");
+        try {
+            return serviceTaskRepository.findServiceTasksWithFilters(search, serviceRecordId).stream()
+                    .map(this::mapToResponse)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            logger.error("Error fetching filtered service tasks", e);
+            throw new RuntimeException("Ошибка при получении отфильтрованных сервисных задач", e);
+        }
+    }
+
+    @Transactional(readOnly = true)
     public ServiceTaskResponse getServiceTaskById(Long id) {
         logger.info("Fetching service task with ID: {}", id);
         ServiceTask task = serviceTaskRepository.findById(id)

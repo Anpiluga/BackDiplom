@@ -19,4 +19,28 @@ public interface AdditionalExpenseRepository extends JpaRepository<AdditionalExp
     List<AdditionalExpense> findByCarIdAndDateTimeBetween(@Param("carId") Long carId,
                                                           @Param("startDate") LocalDateTime startDate,
                                                           @Param("endDate") LocalDateTime endDate);
+
+    // Комплексный фильтр для дополнительных расходов
+    @Query("SELECT ae FROM AdditionalExpense ae WHERE " +
+            "(:search IS NULL OR :search = '' OR " +
+            "LOWER(ae.type) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+            "LOWER(ae.description) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+            "LOWER(ae.car.brand) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+            "LOWER(ae.car.model) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+            "LOWER(ae.car.licensePlate) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
+            "(:type IS NULL OR :type = '' OR " +
+            "LOWER(ae.type) LIKE LOWER(CONCAT('%', :type, '%'))) AND " +
+            "(:minPrice IS NULL OR ae.price >= :minPrice) AND " +
+            "(:maxPrice IS NULL OR ae.price <= :maxPrice) AND " +
+            "(:startDate IS NULL OR ae.dateTime >= :startDate) AND " +
+            "(:endDate IS NULL OR ae.dateTime <= :endDate)")
+    List<AdditionalExpense> findAdditionalExpensesWithFilters(@Param("search") String search,
+                                                              @Param("type") String type,
+                                                              @Param("minPrice") Double minPrice,
+                                                              @Param("maxPrice") Double maxPrice,
+                                                              @Param("startDate") LocalDateTime startDate,
+                                                              @Param("endDate") LocalDateTime endDate);
+
+    List<AdditionalExpense> findByTypeContainingIgnoreCase(String type);
+    List<AdditionalExpense> findByPriceBetween(Double minPrice, Double maxPrice);
 }

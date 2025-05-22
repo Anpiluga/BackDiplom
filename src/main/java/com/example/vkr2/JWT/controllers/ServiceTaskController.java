@@ -71,6 +71,21 @@ public class ServiceTaskController {
         }
     }
 
+    @Operation(summary = "Получить сервисные задачи с фильтрами")
+    @GetMapping("/filter")
+    public ResponseEntity<List<ServiceTaskResponse>> getServiceTasksWithFilters(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Long serviceRecordId) {
+        try {
+            logger.info("Получение сервисных задач с фильтрами");
+            List<ServiceTaskResponse> tasks = serviceTaskService.getServiceTasksWithFilters(search, serviceRecordId);
+            return ResponseEntity.ok(tasks);
+        } catch (Exception e) {
+            logger.error("Ошибка при получении отфильтрованного списка сервисных задач: {}", e.getMessage(), e);
+            return ResponseEntity.ok(Collections.emptyList());
+        }
+    }
+
     @Operation(summary = "Получить сервисную задачу по ID")
     @GetMapping("/{id}")
     public ResponseEntity<ServiceTaskResponse> getServiceTaskById(@PathVariable Long id) {

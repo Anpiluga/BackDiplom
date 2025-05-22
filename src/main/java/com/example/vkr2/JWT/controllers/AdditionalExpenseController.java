@@ -73,6 +73,26 @@ public class AdditionalExpenseController {
         }
     }
 
+    @Operation(summary = "Получить дополнительные расходы с фильтрами")
+    @GetMapping("/filter")
+    public ResponseEntity<List<AdditionalExpenseResponse>> getAdditionalExpensesWithFilters(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) Double minPrice,
+            @RequestParam(required = false) Double maxPrice,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate) {
+        try {
+            logger.info("Получение дополнительных расходов с фильтрами");
+            List<AdditionalExpenseResponse> expenses = additionalExpenseService.getAdditionalExpensesWithFilters(
+                    search, type, minPrice, maxPrice, startDate, endDate);
+            return ResponseEntity.ok(expenses);
+        } catch (Exception e) {
+            logger.error("Ошибка при получении отфильтрованного списка дополнительных расходов: {}", e.getMessage(), e);
+            return ResponseEntity.ok(Collections.emptyList());
+        }
+    }
+
     @Operation(summary = "Получить дополнительный расход по ID")
     @GetMapping("/{id}")
     public ResponseEntity<AdditionalExpenseResponse> getAdditionalExpenseById(@PathVariable Long id) {

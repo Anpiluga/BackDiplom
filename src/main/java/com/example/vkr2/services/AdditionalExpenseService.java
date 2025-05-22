@@ -79,6 +79,22 @@ public class AdditionalExpenseService {
     }
 
     @Transactional(readOnly = true)
+    public List<AdditionalExpenseResponse> getAdditionalExpensesWithFilters(String search, String type,
+                                                                            Double minPrice, Double maxPrice,
+                                                                            LocalDateTime startDate, LocalDateTime endDate) {
+        logger.info("Fetching additional expenses with filters");
+        try {
+            return additionalExpenseRepository.findAdditionalExpensesWithFilters(search, type, minPrice,
+                            maxPrice, startDate, endDate).stream()
+                    .map(this::mapToResponse)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            logger.error("Error fetching filtered additional expenses", e);
+            throw new RuntimeException("Ошибка при получении отфильтрованных дополнительных расходов", e);
+        }
+    }
+
+    @Transactional(readOnly = true)
     public AdditionalExpenseResponse getAdditionalExpenseById(Long id) {
         logger.info("Fetching additional expense with ID: {}", id);
         AdditionalExpense expense = additionalExpenseRepository.findById(id)

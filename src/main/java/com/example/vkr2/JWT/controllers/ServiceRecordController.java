@@ -10,10 +10,12 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Collections;
 
@@ -67,6 +69,26 @@ public class ServiceRecordController {
             return ResponseEntity.ok(records);
         } catch (Exception e) {
             logger.error("Ошибка при получении списка сервисных записей: {}", e.getMessage(), e);
+            return ResponseEntity.ok(Collections.emptyList());
+        }
+    }
+
+    @Operation(summary = "Получить сервисные записи с фильтрами")
+    @GetMapping("/filter")
+    public ResponseEntity<List<ServiceRecordResponse>> getServiceRecordsWithFilters(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Long carId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) Double minCost,
+            @RequestParam(required = false) Double maxCost) {
+        try {
+            logger.info("Получение сервисных записей с фильтрами");
+            List<ServiceRecordResponse> records = serviceRecordService.getServiceRecordsWithFilters(
+                    search, carId, startDate, endDate, minCost, maxCost);
+            return ResponseEntity.ok(records);
+        } catch (Exception e) {
+            logger.error("Ошибка при получении отфильтрованного списка сервисных записей: {}", e.getMessage(), e);
             return ResponseEntity.ok(Collections.emptyList());
         }
     }

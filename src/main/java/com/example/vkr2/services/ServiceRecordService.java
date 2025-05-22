@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -76,6 +77,22 @@ public class ServiceRecordService {
         } catch (Exception e) {
             logger.error("Error fetching service records", e);
             throw new RuntimeException("Ошибка при получении сервисных записей", e);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public List<ServiceRecordResponse> getServiceRecordsWithFilters(String search, Long carId,
+                                                                    LocalDate startDate, LocalDate endDate,
+                                                                    Double minCost, Double maxCost) {
+        logger.info("Fetching service records with filters");
+        try {
+            return serviceRecordRepository.findServiceRecordsWithFilters(search, carId, startDate,
+                            endDate, minCost, maxCost).stream()
+                    .map(this::mapToResponse)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            logger.error("Error fetching filtered service records", e);
+            throw new RuntimeException("Ошибка при получении отфильтрованных сервисных записей", e);
         }
     }
 
