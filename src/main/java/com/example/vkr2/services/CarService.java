@@ -130,6 +130,16 @@ public class CarService {
         try {
             Car car = carRepository.findById(id)
                     .orElseThrow(() -> new EntityNotFoundException("Автомобиль с ID " + id + " не найден"));
+
+            // Отвязываем водителя перед удалением автомобиля
+            if (car.getDriver() != null) {
+                Driver driver = car.getDriver();
+                car.setDriver(null);
+                driver.setCar(null);
+                carRepository.save(car); // Сохраняем изменения перед удалением
+                logger.info("Driver unassigned from car ID: {} before deletion", id);
+            }
+
             carRepository.delete(car);
             logger.info("Car deleted with ID: {}", id);
         } catch (Exception e) {
