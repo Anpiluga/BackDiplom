@@ -27,7 +27,7 @@ public class SparePart {
     @Column(nullable = false)
     private String manufacturer;
 
-    @Column(nullable = false)
+    @Column(name = "price_per_unit", nullable = false)
     private Double pricePerUnit;
 
     @Column(nullable = false)
@@ -37,14 +37,22 @@ public class SparePart {
     @Column(nullable = false)
     private Unit unit;
 
-    @Column(nullable = false)
+    @Column(name = "total_sum", nullable = false)
     private Double totalSum;
 
     @Column(length = 1000)
     private String description;
 
-    @Column(nullable = false)
-    private LocalDateTime dateAdded;
+    // Принудительно создаем столбец с четкими параметрами
+    @Column(name = "date_time", nullable = false, columnDefinition = "TIMESTAMP")
+    private LocalDateTime dateTime;
+
+    @PrePersist
+    protected void onCreate() {
+        if (dateTime == null) {
+            dateTime = LocalDateTime.now();
+        }
+    }
 
     public enum Category {
         CONSUMABLES("Расходники"),

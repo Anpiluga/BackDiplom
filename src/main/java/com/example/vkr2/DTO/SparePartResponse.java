@@ -37,6 +37,6 @@ public class SparePartResponse {
     @Schema(description = "Описание", example = "Фильтр для замены масла")
     private String description;
 
-    @Schema(description = "Дата добавления", example = "2025-05-20T14:30:00")
-    private LocalDateTime dateAdded;
+    @Schema(description = "Дата и время добавления", example = "2025-05-20T14:30:00")
+    private LocalDateTime dateTime;
 }

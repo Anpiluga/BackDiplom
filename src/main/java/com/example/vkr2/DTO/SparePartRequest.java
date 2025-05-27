@@ -41,7 +41,7 @@ public class SparePartRequest {
     @Size(max = 1000, message = "Описание не может превышать 1000 символов")
     private String description;
 
-    @Schema(description = "Дата добавления", example = "2025-05-20T14:30:00")
-    @NotNull(message = "Дата добавления не может быть пустой")
-    private LocalDateTime dateAdded;
+    @Schema(description = "Дата и время добавления", example = "2025-05-20T14:30:00")
+    @NotNull(message = "Дата и время не могут быть пустыми")
+    private LocalDateTime dateTime;
 }

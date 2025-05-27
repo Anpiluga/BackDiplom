@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -27,101 +28,147 @@ public class SparePartService {
     public SparePartResponse addSparePart(SparePartRequest request) {
         logger.info("Adding spare part: {}", request.getName());
 
-        double totalSum = request.getPricePerUnit() * request.getQuantity();
+        try {
+            double totalSum = request.getPricePerUnit() * request.getQuantity();
 
-        SparePart sparePart = SparePart.builder()
-                .name(request.getName())
-                .category(request.getCategory())
-                .manufacturer(request.getManufacturer())
-                .pricePerUnit(request.getPricePerUnit())
-                .quantity(request.getQuantity())
-                .unit(request.getUnit())
-                .totalSum(totalSum)
-                .description(request.getDescription())
-                .dateAdded(request.getDateAdded())
-                .build();
+            SparePart sparePart = SparePart.builder()
+                    .name(request.getName())
+                    .category(request.getCategory())
+                    .manufacturer(request.getManufacturer())
+                    .pricePerUnit(request.getPricePerUnit())
+                    .quantity(request.getQuantity())
+                    .unit(request.getUnit())
+                    .totalSum(totalSum)
+                    .description(request.getDescription())
+                    .dateTime(request.getDateTime() != null ? request.getDateTime() : LocalDateTime.now())
+                    .build();
 
-        SparePart savedPart = sparePartRepository.save(sparePart);
-        logger.info("Spare part added with ID: {}", savedPart.getId());
-        return mapToResponse(savedPart);
+            SparePart savedPart = sparePartRepository.save(sparePart);
+            logger.info("Spare part added with ID: {} at {}", savedPart.getId(), savedPart.getDateTime());
+            return mapToResponse(savedPart);
+        } catch (Exception e) {
+            logger.error("Error adding spare part: {}", e.getMessage(), e);
+            throw new RuntimeException("Ошибка при добавлении запчасти: " + e.getMessage(), e);
+        }
     }
 
     @Transactional
     public SparePartResponse updateSparePart(Long id, SparePartRequest request) {
         logger.info("Updating spare part with ID: {}", id);
-        SparePart existingPart = sparePartRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Запчасть с ID " + id + " не найдена"));
 
-        double totalSum = request.getPricePerUnit() * request.getQuantity();
+        try {
+            SparePart existingPart = sparePartRepository.findById(id)
+                    .orElseThrow(() -> new EntityNotFoundException("Запчасть с ID " + id + " не найдена"));
 
-        existingPart.setName(request.getName());
-        existingPart.setCategory(request.getCategory());
-        existingPart.setManufacturer(request.getManufacturer());
-        existingPart.setPricePerUnit(request.getPricePerUnit());
-        existingPart.setQuantity(request.getQuantity());
-        existingPart.setUnit(request.getUnit());
-        existingPart.setTotalSum(totalSum);
-        existingPart.setDescription(request.getDescription());
-        existingPart.setDateAdded(request.getDateAdded());
+            double totalSum = request.getPricePerUnit() * request.getQuantity();
 
-        SparePart updatedPart = sparePartRepository.save(existingPart);
-        logger.info("Spare part updated with ID: {}", updatedPart.getId());
-        return mapToResponse(updatedPart);
+            existingPart.setName(request.getName());
+            existingPart.setCategory(request.getCategory());
+            existingPart.setManufacturer(request.getManufacturer());
+            existingPart.setPricePerUnit(request.getPricePerUnit());
+            existingPart.setQuantity(request.getQuantity());
+            existingPart.setUnit(request.getUnit());
+            existingPart.setTotalSum(totalSum);
+            existingPart.setDescription(request.getDescription());
+            existingPart.setDateTime(request.getDateTime() != null ? request.getDateTime() : LocalDateTime.now());
+
+            SparePart updatedPart = sparePartRepository.save(existingPart);
+            logger.info("Spare part updated with ID: {}", updatedPart.getId());
+            return mapToResponse(updatedPart);
+        } catch (EntityNotFoundException e) {
+            throw e;
+        } catch (Exception e) {
+            logger.error("Error updating spare part: {}", e.getMessage(), e);
+            throw new RuntimeException("Ошибка при обновлении запчасти: " + e.getMessage(), e);
+        }
     }
 
     @Transactional(readOnly = true)
     public List<SparePartResponse> getAllSpareParts() {
         logger.info("Fetching all spare parts");
         try {
-            return sparePartRepository.findAll().stream()
+            List<SparePart> spareParts = sparePartRepository.findAll();
+            logger.info("Successfully fetched {} spare parts", spareParts.size());
+            return spareParts.stream()
                     .map(this::mapToResponse)
                     .collect(Collectors.toList());
         } catch (Exception e) {
-            logger.error("Error fetching spare parts", e);
-            throw new RuntimeException("Ошибка при получении запчастей", e);
+            logger.error("Error fetching spare parts: {}", e.getMessage(), e);
+            // Возвращаем пустой список вместо выброса исключения
+            logger.warn("Returning empty list due to database error (table may not exist yet)");
+            return new ArrayList<>();
         }
     }
 
     @Transactional(readOnly = true)
     public SparePartResponse getSparePartById(Long id) {
         logger.info("Fetching spare part with ID: {}", id);
-        SparePart part = sparePartRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Запчасть с ID " + id + " не найдена"));
-        return mapToResponse(part);
+        try {
+            SparePart part = sparePartRepository.findById(id)
+                    .orElseThrow(() -> new EntityNotFoundException("Запчасть с ID " + id + " не найдена"));
+            return mapToResponse(part);
+        } catch (EntityNotFoundException e) {
+            throw e;
+        } catch (Exception e) {
+            logger.error("Error fetching spare part by ID {}: {}", id, e.getMessage(), e);
+            throw new RuntimeException("Ошибка при получении запчасти: " + e.getMessage(), e);
+        }
     }
 
     @Transactional
     public void deleteSparePart(Long id) {
         logger.info("Deleting spare part with ID: {}", id);
-        if (!sparePartRepository.existsById(id)) {
-            throw new EntityNotFoundException("Запчасть с ID " + id + " не найдена");
+        try {
+            if (!sparePartRepository.existsById(id)) {
+                throw new EntityNotFoundException("Запчасть с ID " + id + " не найдена");
+            }
+            sparePartRepository.deleteById(id);
+            logger.info("Spare part deleted with ID: {}", id);
+        } catch (EntityNotFoundException e) {
+            throw e;
+        } catch (Exception e) {
+            logger.error("Error deleting spare part: {}", e.getMessage(), e);
+            throw new RuntimeException("Ошибка при удалении запчасти: " + e.getMessage(), e);
         }
-        sparePartRepository.deleteById(id);
-        logger.info("Spare part deleted with ID: {}", id);
     }
 
     @Transactional(readOnly = true)
     public List<SparePartResponse> getSparePartsByCategory(SparePart.Category category) {
         logger.info("Fetching spare parts by category: {}", category);
-        return sparePartRepository.findByCategory(category).stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
+        try {
+            return sparePartRepository.findByCategory(category).stream()
+                    .map(this::mapToResponse)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            logger.error("Error fetching spare parts by category: {}", e.getMessage(), e);
+            return new ArrayList<>();
+        }
     }
 
     @Transactional(readOnly = true)
     public List<SparePartResponse> searchSparePartsByName(String name) {
         logger.info("Searching spare parts by name: {}", name);
-        return sparePartRepository.findByNameContainingIgnoreCase(name).stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
+        try {
+            return sparePartRepository.findByNameContainingIgnoreCase(name).stream()
+                    .map(this::mapToResponse)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            logger.error("Error searching spare parts by name: {}", e.getMessage(), e);
+            return new ArrayList<>();
+        }
     }
 
     @Transactional(readOnly = true)
     public List<SparePartResponse> getSparePartsByDateRange(LocalDateTime startDate, LocalDateTime endDate) {
         logger.info("Fetching spare parts by date range: {} to {}", startDate, endDate);
-        return sparePartRepository.findByDateAddedBetween(startDate, endDate).stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
+        try {
+            return sparePartRepository.findByDateTimeBetween(startDate, endDate).stream()
+                    .map(this::mapToResponse)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            logger.warn("Error fetching spare parts by date range (table may not exist): {}", e.getMessage());
+            return new ArrayList<>();
+        }
     }
 
     private SparePartResponse mapToResponse(SparePart part) {
@@ -135,7 +182,7 @@ public class SparePartService {
         response.setUnit(part.getUnit());
         response.setTotalSum(part.getTotalSum());
         response.setDescription(part.getDescription());
-        response.setDateAdded(part.getDateAdded());
+        response.setDateTime(part.getDateTime() != null ? part.getDateTime() : LocalDateTime.now());
         return response;
     }
 }

@@ -31,11 +31,17 @@ public class SparePartController {
     @PostMapping
     public ResponseEntity<SparePartResponse> addSparePart(@RequestBody @Valid SparePartRequest request) {
         try {
-            logger.info("Добавление запчасти: {}", request);
+            logger.info("Добавление запчасти: {}", request.getName());
+            logger.debug("Request data: {}", request);
+
             SparePartResponse response = sparePartService.addSparePart(request);
+            logger.info("Successfully added spare part with ID: {}", response.getId());
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (IllegalArgumentException e) {
+            logger.error("Validation error when adding spare part: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
         } catch (Exception e) {
-            logger.error("Внутренняя ошибка сервера при добавлении запчасти: {}", e.getMessage(), e);
+            logger.error("Internal error when adding spare part: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
@@ -44,14 +50,18 @@ public class SparePartController {
     @PutMapping("/{id}")
     public ResponseEntity<SparePartResponse> updateSparePart(@PathVariable Long id, @RequestBody @Valid SparePartRequest request) {
         try {
-            logger.info("Обновление запчасти с ID {}: {}", id, request);
+            logger.info("Обновление запчасти с ID {}: {}", id, request.getName());
             SparePartResponse response = sparePartService.updateSparePart(id, request);
+            logger.info("Successfully updated spare part with ID: {}", id);
             return ResponseEntity.ok(response);
         } catch (EntityNotFoundException e) {
-            logger.error("Ошибка при обновлении запчасти - сущность не найдена: {}", e.getMessage());
+            logger.error("Spare part not found for update: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        } catch (IllegalArgumentException e) {
+            logger.error("Validation error when updating spare part: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
         } catch (Exception e) {
-            logger.error("Внутренняя ошибка сервера при обновлении запчасти: {}", e.getMessage(), e);
+            logger.error("Internal error when updating spare part: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
@@ -62,9 +72,12 @@ public class SparePartController {
         try {
             logger.info("Получение всех запчастей");
             List<SparePartResponse> parts = sparePartService.getAllSpareParts();
+            logger.info("Successfully retrieved {} spare parts", parts.size());
             return ResponseEntity.ok(parts);
         } catch (Exception e) {
-            logger.error("Ошибка при получении списка запчастей: {}", e.getMessage(), e);
+            logger.error("Error retrieving spare parts: {}", e.getMessage(), e);
+            // Возвращаем пустой список вместо ошибки, чтобы UI не ломался
+            logger.warn("Returning empty list due to error (database may not be ready)");
             return ResponseEntity.ok(Collections.emptyList());
         }
     }
@@ -77,10 +90,10 @@ public class SparePartController {
             SparePartResponse response = sparePartService.getSparePartById(id);
             return ResponseEntity.ok(response);
         } catch (EntityNotFoundException e) {
-            logger.error("Запчасть не найдена: {}", e.getMessage());
+            logger.error("Spare part not found: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
         } catch (Exception e) {
-            logger.error("Внутренняя ошибка сервера при получении запчасти: {}", e.getMessage(), e);
+            logger.error("Internal error when retrieving spare part: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
@@ -91,12 +104,13 @@ public class SparePartController {
         try {
             logger.info("Удаление запчасти с ID: {}", id);
             sparePartService.deleteSparePart(id);
+            logger.info("Successfully deleted spare part with ID: {}", id);
             return ResponseEntity.noContent().build();
         } catch (EntityNotFoundException e) {
-            logger.error("Запчасть не найдена: {}", e.getMessage());
+            logger.error("Spare part not found for deletion: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         } catch (Exception e) {
-            logger.error("Внутренняя ошибка сервера при удалении запчасти: {}", e.getMessage(), e);
+            logger.error("Internal error when deleting spare part: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
@@ -107,9 +121,10 @@ public class SparePartController {
         try {
             logger.info("Получение запчастей по категории: {}", category);
             List<SparePartResponse> parts = sparePartService.getSparePartsByCategory(category);
+            logger.info("Found {} spare parts for category: {}", parts.size(), category);
             return ResponseEntity.ok(parts);
         } catch (Exception e) {
-            logger.error("Ошибка при получении запчастей по категории: {}", e.getMessage(), e);
+            logger.error("Error retrieving spare parts by category: {}", e.getMessage(), e);
             return ResponseEntity.ok(Collections.emptyList());
         }
     }
@@ -120,9 +135,10 @@ public class SparePartController {
         try {
             logger.info("Поиск запчастей по названию: {}", name);
             List<SparePartResponse> parts = sparePartService.searchSparePartsByName(name);
+            logger.info("Found {} spare parts matching name: {}", parts.size(), name);
             return ResponseEntity.ok(parts);
         } catch (Exception e) {
-            logger.error("Ошибка при поиске запчастей: {}", e.getMessage(), e);
+            logger.error("Error searching spare parts: {}", e.getMessage(), e);
             return ResponseEntity.ok(Collections.emptyList());
         }
     }

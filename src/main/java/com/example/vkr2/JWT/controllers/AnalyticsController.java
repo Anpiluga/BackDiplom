@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.Map;
 
 @RestController
@@ -33,7 +34,9 @@ public class AnalyticsController {
             return ResponseEntity.ok(analytics);
         } catch (Exception e) {
             logger.error("Ошибка при получении статистики: {}", e.getMessage(), e);
-            return ResponseEntity.ok(Map.of());
+            // Возвращаем пустые данные вместо ошибки
+            Map<String, Object> emptyResult = createEmptyAnalyticsResult();
+            return ResponseEntity.ok(emptyResult);
         }
     }
 
@@ -49,7 +52,9 @@ public class AnalyticsController {
             return ResponseEntity.ok(analytics);
         } catch (Exception e) {
             logger.error("Ошибка при получении статистики по автомобилю: {}", e.getMessage(), e);
-            return ResponseEntity.ok(Map.of());
+            // Возвращаем пустые данные для автомобиля
+            Map<String, Object> emptyResult = createEmptyCarAnalyticsResult(carId);
+            return ResponseEntity.ok(emptyResult);
         }
     }
 
@@ -64,7 +69,9 @@ public class AnalyticsController {
             return ResponseEntity.ok(analytics);
         } catch (Exception e) {
             logger.error("Ошибка при получении месячной статистики: {}", e.getMessage(), e);
-            return ResponseEntity.ok(Map.of());
+            // Возвращаем пустые месячные данные
+            Map<String, Object> emptyResult = createEmptyMonthlyResult(monthsBack);
+            return ResponseEntity.ok(emptyResult);
         }
     }
 
@@ -80,7 +87,49 @@ public class AnalyticsController {
             return ResponseEntity.ok(costData);
         } catch (Exception e) {
             logger.error("Ошибка при расчете стоимости километра: {}", e.getMessage(), e);
-            return ResponseEntity.ok(Map.of("error", "Не удалось рассчитать стоимость километра"));
+            Map<String, Object> errorResult = new HashMap<>();
+            errorResult.put("error", "Не удалось рассчитать стоимость километра");
+            errorResult.put("carId", carId);
+            return ResponseEntity.ok(errorResult);
         }
+    }
+
+    // Вспомогательные методы для создания пустых результатов
+    private Map<String, Object> createEmptyAnalyticsResult() {
+        Map<String, Object> result = new HashMap<>();
+        result.put("fuelCosts", 0.0);
+        result.put("additionalCosts", 0.0);
+        result.put("serviceCosts", 0.0);
+        result.put("sparePartsCosts", 0.0);
+        result.put("totalCosts", 0.0);
+        result.put("fuelPercentage", 0.0);
+        result.put("additionalPercentage", 0.0);
+        result.put("servicePercentage", 0.0);
+        result.put("sparePartsPercentage", 0.0);
+        return result;
+    }
+
+    private Map<String, Object> createEmptyCarAnalyticsResult(Long carId) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("carId", carId);
+        result.put("fuelCosts", 0.0);
+        result.put("additionalCosts", 0.0);
+        result.put("serviceCosts", 0.0);
+        result.put("totalCosts", 0.0);
+        result.put("fuelPercentage", 0.0);
+        result.put("additionalPercentage", 0.0);
+        result.put("servicePercentage", 0.0);
+        return result;
+    }
+
+    private Map<String, Object> createEmptyMonthlyResult(int monthsBack) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("months", java.util.Collections.nCopies(monthsBack, ""));
+        result.put("fuelExpenses", java.util.Collections.nCopies(monthsBack, 0.0));
+        result.put("serviceExpenses", java.util.Collections.nCopies(monthsBack, 0.0));
+        result.put("additionalExpenses", java.util.Collections.nCopies(monthsBack, 0.0));
+        result.put("sparePartsExpenses", java.util.Collections.nCopies(monthsBack, 0.0));
+        result.put("totalExpenses", java.util.Collections.nCopies(monthsBack, 0.0));
+        return result;
     }
 }

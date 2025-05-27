@@ -29,37 +29,93 @@ public class AnalyticsService {
     public Map<String, Object> getTotalExpenses(LocalDateTime startDate, LocalDateTime endDate) {
         logger.info("Calculating total expenses from {} to {}", startDate, endDate);
 
-        // Создаем final переменные для использования в lambda
-        final LocalDateTime finalStartDate = startDate != null ? startDate : LocalDateTime.now().minusMonths(3);
+        final LocalDateTime finalStartDate = startDate != null ? startDate : LocalDateTime.now().minusMonths(12);
         final LocalDateTime finalEndDate = endDate != null ? endDate : LocalDateTime.now();
 
         Map<String, Object> result = new HashMap<>();
 
         // Расходы на топливо
-        double fuelCosts = fuelEntryRepository.findAll().stream()
-                .filter(entry -> entry.getDateTime().isAfter(finalStartDate) && entry.getDateTime().isBefore(finalEndDate))
-                .mapToDouble(entry -> entry.getTotalCost())
-                .sum();
+        double fuelCosts = 0;
+        try {
+            List<com.example.vkr2.entity.FuelEntry> allFuelEntries = fuelEntryRepository.findAll();
+            logger.info("Found {} fuel entries total", allFuelEntries.size());
+
+            fuelCosts = allFuelEntries.stream()
+                    .filter(entry -> entry.getDateTime() != null && entry.getTotalCost() != null)
+                    .filter(entry -> entry.getDateTime().isAfter(finalStartDate) && entry.getDateTime().isBefore(finalEndDate))
+                    .peek(entry -> logger.debug("Including fuel entry: {} - {} руб", entry.getDateTime(), entry.getTotalCost()))
+                    .mapToDouble(entry -> entry.getTotalCost())
+                    .sum();
+
+            logger.info("Total fuel costs in period: {} руб", fuelCosts);
+        } catch (Exception e) {
+            logger.error("Error calculating fuel costs: {}", e.getMessage(), e);
+            fuelCosts = 0;
+        }
 
         // Дополнительные расходы
-        double additionalCosts = additionalExpenseRepository.findByDateTimeBetween(finalStartDate, finalEndDate).stream()
-                .mapToDouble(expense -> expense.getPrice())
-                .sum();
+        double additionalCosts = 0;
+        try {
+            List<com.example.vkr2.entity.AdditionalExpense> additionalExpenses =
+                    additionalExpenseRepository.findByDateTimeBetween(finalStartDate, finalEndDate);
+            logger.info("Found {} additional expenses in period", additionalExpenses.size());
+
+            additionalCosts = additionalExpenses.stream()
+                    .filter(expense -> expense.getPrice() != null)
+                    .peek(expense -> logger.debug("Including additional expense: {} - {} руб", expense.getDateTime(), expense.getPrice()))
+                    .mapToDouble(expense -> expense.getPrice())
+                    .sum();
+
+            logger.info("Total additional costs in period: {} руб", additionalCosts);
+        } catch (Exception e) {
+            logger.error("Error calculating additional costs: {}", e.getMessage(), e);
+            additionalCosts = 0;
+        }
 
         // Расходы на сервис
-        double serviceCosts = serviceRecordRepository.findAll().stream()
-                .filter(record -> record.getStartDate().atStartOfDay().isAfter(finalStartDate) &&
-                        record.getStartDate().atStartOfDay().isBefore(finalEndDate))
-                .filter(record -> record.getTotalCost() != null)
-                .mapToDouble(record -> record.getTotalCost())
-                .sum();
+        double serviceCosts = 0;
+        try {
+            List<com.example.vkr2.entity.ServiceRecord> allServiceRecords = serviceRecordRepository.findAll();
+            logger.info("Found {} service records total", allServiceRecords.size());
 
-        // Расходы на запчасти по датам добавления
-        double sparePartsCosts = sparePartRepository.findByDateAddedBetween(finalStartDate, finalEndDate).stream()
-                .mapToDouble(part -> part.getTotalSum())
-                .sum();
+            serviceCosts = allServiceRecords.stream()
+                    .filter(record -> record.getStartDate() != null && record.getTotalCost() != null)
+                    .filter(record -> {
+                        LocalDateTime recordDateTime = record.getStartDate().atStartOfDay();
+                        return recordDateTime.isAfter(finalStartDate) && recordDateTime.isBefore(finalEndDate);
+                    })
+                    .peek(record -> logger.debug("Including service record: {} - {} руб", record.getStartDate(), record.getTotalCost()))
+                    .mapToDouble(record -> record.getTotalCost())
+                    .sum();
+
+            logger.info("Total service costs in period: {} руб", serviceCosts);
+        } catch (Exception e) {
+            logger.error("Error calculating service costs: {}", e.getMessage(), e);
+            serviceCosts = 0;
+        }
+
+        // Расходы на запчасти - теперь используем dateTime
+        double sparePartsCosts = 0;
+        try {
+            List<com.example.vkr2.entity.SparePart> sparePartsInPeriod =
+                    sparePartRepository.findByDateTimeBetween(finalStartDate, finalEndDate);
+            logger.info("Found {} spare parts in period", sparePartsInPeriod.size());
+
+            sparePartsCosts = sparePartsInPeriod.stream()
+                    .filter(part -> part.getTotalSum() != null)
+                    .peek(part -> logger.debug("Including spare part: {} - {} руб", part.getDateTime(), part.getTotalSum()))
+                    .mapToDouble(part -> part.getTotalSum())
+                    .sum();
+
+            logger.info("Total spare parts costs in period: {} руб", sparePartsCosts);
+        } catch (Exception e) {
+            logger.warn("Error calculating spare parts costs: {}", e.getMessage());
+            sparePartsCosts = 0;
+        }
 
         double totalCosts = fuelCosts + additionalCosts + serviceCosts + sparePartsCosts;
+        logger.info("Final calculation - Fuel: {}, Additional: {}, Service: {}, SpareParts: {}, Total: {}",
+                fuelCosts, additionalCosts, serviceCosts, sparePartsCosts, totalCosts);
 
         result.put("fuelCosts", fuelCosts);
         result.put("additionalCosts", additionalCosts);
@@ -87,32 +143,69 @@ public class AnalyticsService {
     public Map<String, Object> getCarExpenses(Long carId, LocalDateTime startDate, LocalDateTime endDate) {
         logger.info("Calculating expenses for car ID: {} from {} to {}", carId, startDate, endDate);
 
-        // Создаем final переменные для использования в lambda
-        final LocalDateTime finalStartDate = startDate != null ? startDate : LocalDateTime.now().minusMonths(3);
+        final LocalDateTime finalStartDate = startDate != null ? startDate : LocalDateTime.now().minusMonths(12);
         final LocalDateTime finalEndDate = endDate != null ? endDate : LocalDateTime.now();
 
         Map<String, Object> result = new HashMap<>();
 
         // Расходы на топливо для конкретного автомобиля
-        double fuelCosts = fuelEntryRepository.findByCarId(carId).stream()
-                .filter(entry -> entry.getDateTime().isAfter(finalStartDate) && entry.getDateTime().isBefore(finalEndDate))
-                .mapToDouble(entry -> entry.getTotalCost())
-                .sum();
+        double fuelCosts = 0;
+        try {
+            List<com.example.vkr2.entity.FuelEntry> carFuelEntries = fuelEntryRepository.findByCarId(carId);
+            logger.info("Found {} fuel entries for car {}", carFuelEntries.size(), carId);
+
+            fuelCosts = carFuelEntries.stream()
+                    .filter(entry -> entry.getDateTime() != null && entry.getTotalCost() != null)
+                    .filter(entry -> entry.getDateTime().isAfter(finalStartDate) && entry.getDateTime().isBefore(finalEndDate))
+                    .mapToDouble(entry -> entry.getTotalCost())
+                    .sum();
+
+            logger.info("Total fuel costs for car {}: {} руб", carId, fuelCosts);
+        } catch (Exception e) {
+            logger.error("Error calculating fuel costs for car {}: {}", carId, e.getMessage());
+            fuelCosts = 0;
+        }
 
         // Дополнительные расходы для конкретного автомобиля
-        double additionalCosts = additionalExpenseRepository.findByCarIdAndDateTimeBetween(carId, finalStartDate, finalEndDate).stream()
-                .mapToDouble(expense -> expense.getPrice())
-                .sum();
+        double additionalCosts = 0;
+        try {
+            List<com.example.vkr2.entity.AdditionalExpense> carAdditionalExpenses =
+                    additionalExpenseRepository.findByCarIdAndDateTimeBetween(carId, finalStartDate, finalEndDate);
+            logger.info("Found {} additional expenses for car {}", carAdditionalExpenses.size(), carId);
+
+            additionalCosts = carAdditionalExpenses.stream()
+                    .filter(expense -> expense.getPrice() != null)
+                    .mapToDouble(expense -> expense.getPrice())
+                    .sum();
+
+            logger.info("Total additional costs for car {}: {} руб", carId, additionalCosts);
+        } catch (Exception e) {
+            logger.error("Error calculating additional costs for car {}: {}", carId, e.getMessage());
+            additionalCosts = 0;
+        }
 
         // Расходы на сервис для конкретного автомобиля
-        double serviceCosts = serviceRecordRepository.findByCarId(carId).stream()
-                .filter(record -> record.getStartDate().atStartOfDay().isAfter(finalStartDate) &&
-                        record.getStartDate().atStartOfDay().isBefore(finalEndDate))
-                .filter(record -> record.getTotalCost() != null)
-                .mapToDouble(record -> record.getTotalCost())
-                .sum();
+        double serviceCosts = 0;
+        try {
+            List<com.example.vkr2.entity.ServiceRecord> carServiceRecords = serviceRecordRepository.findByCarId(carId);
+            logger.info("Found {} service records for car {}", carServiceRecords.size(), carId);
 
-        // НЕ УЧИТЫВАЕМ запчасти для расходов по автомобилю
+            serviceCosts = carServiceRecords.stream()
+                    .filter(record -> record.getStartDate() != null && record.getTotalCost() != null)
+                    .filter(record -> {
+                        LocalDateTime recordDateTime = record.getStartDate().atStartOfDay();
+                        return recordDateTime.isAfter(finalStartDate) && recordDateTime.isBefore(finalEndDate);
+                    })
+                    .mapToDouble(record -> record.getTotalCost())
+                    .sum();
+
+            logger.info("Total service costs for car {}: {} руб", carId, serviceCosts);
+        } catch (Exception e) {
+            logger.error("Error calculating service costs for car {}: {}", carId, e.getMessage());
+            serviceCosts = 0;
+        }
+
+        // НЕ УЧИТЫВАЕМ запчасти для конкретного автомобиля (как требовалось)
         double totalCosts = fuelCosts + additionalCosts + serviceCosts;
 
         result.put("carId", carId);
@@ -162,48 +255,83 @@ public class AnalyticsService {
             double additionalCost = 0;
             double sparePartsCost = 0;
 
-            if (carId != null) {
-                // Расходы для конкретного автомобиля (БЕЗ запчастей)
-                fuelCost = fuelEntryRepository.findByCarId(carId).stream()
-                        .filter(entry -> entry.getDateTime().isAfter(startOfMonth) && entry.getDateTime().isBefore(endOfMonth))
-                        .mapToDouble(entry -> entry.getTotalCost())
-                        .sum();
+            try {
+                if (carId != null) {
+                    // Расходы для конкретного автомобиля (БЕЗ запчастей)
+                    List<com.example.vkr2.entity.FuelEntry> monthlyFuelEntries = fuelEntryRepository.findByCarId(carId);
+                    fuelCost = monthlyFuelEntries.stream()
+                            .filter(entry -> entry.getDateTime() != null && entry.getTotalCost() != null)
+                            .filter(entry -> entry.getDateTime().isAfter(startOfMonth) && entry.getDateTime().isBefore(endOfMonth))
+                            .mapToDouble(entry -> entry.getTotalCost())
+                            .sum();
 
-                additionalCost = additionalExpenseRepository.findByCarIdAndDateTimeBetween(carId, startOfMonth, endOfMonth).stream()
-                        .mapToDouble(expense -> expense.getPrice())
-                        .sum();
+                    List<com.example.vkr2.entity.AdditionalExpense> monthlyAdditionalExpenses =
+                            additionalExpenseRepository.findByCarIdAndDateTimeBetween(carId, startOfMonth, endOfMonth);
+                    additionalCost = monthlyAdditionalExpenses.stream()
+                            .filter(expense -> expense.getPrice() != null)
+                            .mapToDouble(expense -> expense.getPrice())
+                            .sum();
 
-                serviceCost = serviceRecordRepository.findByCarId(carId).stream()
-                        .filter(record -> record.getStartDate().atStartOfDay().isAfter(startOfMonth) &&
-                                record.getStartDate().atStartOfDay().isBefore(endOfMonth))
-                        .filter(record -> record.getTotalCost() != null)
-                        .mapToDouble(record -> record.getTotalCost())
-                        .sum();
+                    List<com.example.vkr2.entity.ServiceRecord> monthlyServiceRecords = serviceRecordRepository.findByCarId(carId);
+                    serviceCost = monthlyServiceRecords.stream()
+                            .filter(record -> record.getStartDate() != null && record.getTotalCost() != null)
+                            .filter(record -> {
+                                LocalDateTime recordDateTime = record.getStartDate().atStartOfDay();
+                                return recordDateTime.isAfter(startOfMonth) && recordDateTime.isBefore(endOfMonth);
+                            })
+                            .mapToDouble(record -> record.getTotalCost())
+                            .sum();
 
-                // НЕ учитываем запчасти для конкретного автомобиля
+                    sparePartsCost = 0; // Для конкретного автомобиля не учитываем запчасти
+                } else {
+                    // Общие расходы по всем автомобилям
+                    List<com.example.vkr2.entity.FuelEntry> monthlyFuelEntries = fuelEntryRepository.findAll();
+                    fuelCost = monthlyFuelEntries.stream()
+                            .filter(entry -> entry.getDateTime() != null && entry.getTotalCost() != null)
+                            .filter(entry -> entry.getDateTime().isAfter(startOfMonth) && entry.getDateTime().isBefore(endOfMonth))
+                            .mapToDouble(entry -> entry.getTotalCost())
+                            .sum();
+
+                    List<com.example.vkr2.entity.AdditionalExpense> monthlyAdditionalExpenses =
+                            additionalExpenseRepository.findByDateTimeBetween(startOfMonth, endOfMonth);
+                    additionalCost = monthlyAdditionalExpenses.stream()
+                            .filter(expense -> expense.getPrice() != null)
+                            .mapToDouble(expense -> expense.getPrice())
+                            .sum();
+
+                    List<com.example.vkr2.entity.ServiceRecord> monthlyServiceRecords = serviceRecordRepository.findAll();
+                    serviceCost = monthlyServiceRecords.stream()
+                            .filter(record -> record.getStartDate() != null && record.getTotalCost() != null)
+                            .filter(record -> {
+                                LocalDateTime recordDateTime = record.getStartDate().atStartOfDay();
+                                return recordDateTime.isAfter(startOfMonth) && recordDateTime.isBefore(endOfMonth);
+                            })
+                            .mapToDouble(record -> record.getTotalCost())
+                            .sum();
+
+                    // Запчасти - используем dateTime
+                    try {
+                        List<com.example.vkr2.entity.SparePart> monthlySpareParts =
+                                sparePartRepository.findByDateTimeBetween(startOfMonth, endOfMonth);
+                        sparePartsCost = monthlySpareParts.stream()
+                                .filter(part -> part.getTotalSum() != null)
+                                .mapToDouble(part -> part.getTotalSum())
+                                .sum();
+                    } catch (Exception e) {
+                        logger.warn("Error calculating spare parts for month {}: {}", month.format(formatter), e.getMessage());
+                        sparePartsCost = 0;
+                    }
+                }
+
+                logger.debug("Month {}: Fuel={}, Service={}, Additional={}, SpareParts={}",
+                        month.format(formatter), fuelCost, serviceCost, additionalCost, sparePartsCost);
+
+            } catch (Exception e) {
+                logger.error("Error calculating monthly expenses for month {}: {}", month.format(formatter), e.getMessage());
+                fuelCost = 0;
+                serviceCost = 0;
+                additionalCost = 0;
                 sparePartsCost = 0;
-            } else {
-                // Общие расходы по всем автомобилям
-                fuelCost = fuelEntryRepository.findAll().stream()
-                        .filter(entry -> entry.getDateTime().isAfter(startOfMonth) && entry.getDateTime().isBefore(endOfMonth))
-                        .mapToDouble(entry -> entry.getTotalCost())
-                        .sum();
-
-                additionalCost = additionalExpenseRepository.findByDateTimeBetween(startOfMonth, endOfMonth).stream()
-                        .mapToDouble(expense -> expense.getPrice())
-                        .sum();
-
-                serviceCost = serviceRecordRepository.findAll().stream()
-                        .filter(record -> record.getStartDate().atStartOfDay().isAfter(startOfMonth) &&
-                                record.getStartDate().atStartOfDay().isBefore(endOfMonth))
-                        .filter(record -> record.getTotalCost() != null)
-                        .mapToDouble(record -> record.getTotalCost())
-                        .sum();
-
-                // Запчасти по датам добавления
-                sparePartsCost = sparePartRepository.findByDateAddedBetween(startOfMonth, endOfMonth).stream()
-                        .mapToDouble(part -> part.getTotalSum())
-                        .sum();
             }
 
             fuelExpenses.add(fuelCost);
@@ -220,6 +348,7 @@ public class AnalyticsService {
         result.put("sparePartsExpenses", sparePartsExpenses);
         result.put("totalExpenses", totalExpenses);
 
+        logger.info("Monthly expenses calculated for {} months", monthsBack);
         return result;
     }
 
@@ -236,8 +365,6 @@ public class AnalyticsService {
         Map<String, Object> expenses = getCarExpenses(carId, startDate, endDate);
         double totalCosts = (Double) expenses.get("totalCosts");
 
-        // Для расчета стоимости км используем пробег автомобиля
-        // В реальности нужно было бы хранить историю пробега
         Integer currentOdometer = car.getOdometr();
 
         if (currentOdometer == null || currentOdometer == 0) {

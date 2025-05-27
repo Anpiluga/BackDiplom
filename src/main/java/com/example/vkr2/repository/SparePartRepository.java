@@ -13,7 +13,7 @@ public interface SparePartRepository extends JpaRepository<SparePart, Long> {
     List<SparePart> findByNameContainingIgnoreCase(String name);
     List<SparePart> findByManufacturerContainingIgnoreCase(String manufacturer);
 
-    @Query("SELECT sp FROM SparePart sp WHERE sp.dateAdded BETWEEN :startDate AND :endDate")
-    List<SparePart> findByDateAddedBetween(@Param("startDate") LocalDateTime startDate,
-                                           @Param("endDate") LocalDateTime endDate);
+    @Query("SELECT sp FROM SparePart sp WHERE sp.dateTime BETWEEN :startDate AND :endDate")
+    List<SparePart> findByDateTimeBetween(@Param("startDate") LocalDateTime startDate,
+                                          @Param("endDate") LocalDateTime endDate);
 }
