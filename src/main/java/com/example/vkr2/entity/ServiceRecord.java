@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
@@ -39,4 +40,29 @@ public class ServiceRecord {
 
     @OneToMany(mappedBy = "serviceRecord", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<ServiceTask> serviceTasks;
+
+    // Новые поля для системы напоминаний
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private ServiceStatus status = ServiceStatus.PLANNED;
+
+    @Column
+    private LocalDateTime completedAt;
+
+    public enum ServiceStatus {
+        PLANNED("Запланировано"),
+        IN_PROGRESS("В процессе"),
+        COMPLETED("Выполнено"),
+        CANCELLED("Отменено");
+
+        private final String displayName;
+
+        ServiceStatus(String displayName) {
+            this.displayName = displayName;
+        }
+
+        public String getDisplayName() {
+            return displayName;
+        }
+    }
 }
