@@ -44,10 +44,26 @@ public class ServiceRecord {
     // Новые поля для системы напоминаний
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
+    @Builder.Default
     private ServiceStatus status = ServiceStatus.PLANNED;
 
     @Column
     private LocalDateTime completedAt;
+
+    // Добавляем метод, который будет вызываться перед сохранением
+    @PrePersist
+    protected void onCreate() {
+        if (status == null) {
+            status = ServiceStatus.PLANNED;
+        }
+    }
+
+    // Добавляем метод для установки статуса по умолчанию
+    public void setDefaultStatus() {
+        if (this.status == null) {
+            this.status = ServiceStatus.PLANNED;
+        }
+    }
 
     public enum ServiceStatus {
         PLANNED("Запланировано"),

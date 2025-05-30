@@ -1,9 +1,11 @@
 package com.example.vkr2.DTO;
 
+import com.example.vkr2.entity.ServiceRecord;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Data
 @Schema(description = "Ответ с данными о сервисной записи")
@@ -32,4 +34,10 @@ public class ServiceRecordResponse {
 
     @Schema(description = "Общая сумма работ (руб)", example = "5000.0")
     private Double totalCost;
+
+    @Schema(description = "Статус сервисной записи", example = "PLANNED")
+    private ServiceRecord.ServiceStatus status;
+
+    @Schema(description = "Дата и время завершения работ", example = "2025-05-25T15:30:00")
+    private LocalDateTime completedAt;
 }

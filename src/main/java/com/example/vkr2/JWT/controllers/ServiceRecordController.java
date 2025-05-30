@@ -2,6 +2,7 @@ package com.example.vkr2.JWT.controllers;
 
 import com.example.vkr2.DTO.ServiceRecordRequest;
 import com.example.vkr2.DTO.ServiceRecordResponse;
+import com.example.vkr2.DTO.ServiceRecordStatusRequest;
 import com.example.vkr2.services.ServiceRecordService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -60,6 +61,22 @@ public class ServiceRecordController {
         }
     }
 
+    @Operation(summary = "Изменить статус сервисной записи")
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<ServiceRecordResponse> updateServiceRecordStatus(@PathVariable Long id, @RequestBody @Valid ServiceRecordStatusRequest request) {
+        try {
+            logger.info("Изменение статуса сервисной записи с ID {} на {}", id, request.getStatus());
+            ServiceRecordResponse response = serviceRecordService.updateServiceRecordStatus(id, request.getStatus());
+            return ResponseEntity.ok(response);
+        } catch (EntityNotFoundException e) {
+            logger.error("Ошибка при изменении статуса - сущность не найдена: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        } catch (Exception e) {
+            logger.error("Внутренняя ошибка сервера при изменении статуса: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
+    }
+
     @Operation(summary = "Получить все сервисные записи")
     @GetMapping
     public ResponseEntity<List<ServiceRecordResponse>> getAllServiceRecords() {
@@ -105,6 +122,23 @@ public class ServiceRecordController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
         } catch (Exception e) {
             logger.error("Внутренняя ошибка сервера при получении сервисной записи: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
+    }
+
+    @Operation(summary = "Отметить сервисную запись как выполненную")
+    @PostMapping("/{id}/complete")
+    public ResponseEntity<ServiceRecordResponse> markServiceRecordAsCompleted(@PathVariable Long id) {
+        try {
+            logger.info("Отметка сервисной записи с ID {} как выполненной", id);
+            ServiceRecordResponse response = serviceRecordService.updateServiceRecordStatus(id,
+                    com.example.vkr2.entity.ServiceRecord.ServiceStatus.COMPLETED);
+            return ResponseEntity.ok(response);
+        } catch (EntityNotFoundException e) {
+            logger.error("Сервисная запись не найдена: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        } catch (Exception e) {
+            logger.error("Внутренняя ошибка сервера при отметке записи как выполненной: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }

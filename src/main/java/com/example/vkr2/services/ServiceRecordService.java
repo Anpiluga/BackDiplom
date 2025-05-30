@@ -39,10 +39,17 @@ public class ServiceRecordService {
                 .plannedEndDate(request.getPlannedEndDate())
                 .details(request.getDetails())
                 .totalCost(request.getTotalCost())
+                .status(ServiceRecord.ServiceStatus.PLANNED) // Явно устанавливаем статус
                 .build();
 
+        // Дополнительная проверка на случай, если builder не сработал
+        if (serviceRecord.getStatus() == null) {
+            serviceRecord.setStatus(ServiceRecord.ServiceStatus.PLANNED);
+        }
+
         ServiceRecord savedRecord = serviceRecordRepository.save(serviceRecord);
-        logger.info("Service record added with ID: {} for car ID: {}", savedRecord.getId(), request.getCarId());
+        logger.info("Service record added with ID: {} for car ID: {} with status: {}",
+                savedRecord.getId(), request.getCarId(), savedRecord.getStatus());
         return mapToResponse(savedRecord);
     }
 
@@ -61,6 +68,9 @@ public class ServiceRecordService {
         existingRecord.setPlannedEndDate(request.getPlannedEndDate());
         existingRecord.setDetails(request.getDetails());
         existingRecord.setTotalCost(request.getTotalCost());
+
+        // Не изменяем статус при обновлении через обычную форму
+        // Статус должен изменяться отдельными методами
 
         ServiceRecord updatedRecord = serviceRecordRepository.save(existingRecord);
         logger.info("Service record updated with ID: {}", updatedRecord.getId());
@@ -114,6 +124,25 @@ public class ServiceRecordService {
         logger.info("Service record deleted with ID: {}", id);
     }
 
+    // Новые методы для управления статусом
+    @Transactional
+    public ServiceRecordResponse updateServiceRecordStatus(Long id, ServiceRecord.ServiceStatus status) {
+        logger.info("Updating service record status with ID: {} to status: {}", id, status);
+        ServiceRecord record = serviceRecordRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Сервисная запись с ID " + id + " не найдена"));
+
+        record.setStatus(status);
+
+        // Если статус "Выполнено", устанавливаем время завершения
+        if (status == ServiceRecord.ServiceStatus.COMPLETED && record.getCompletedAt() == null) {
+            record.setCompletedAt(java.time.LocalDateTime.now());
+        }
+
+        ServiceRecord updatedRecord = serviceRecordRepository.save(record);
+        logger.info("Service record status updated with ID: {} to status: {}", id, status);
+        return mapToResponse(updatedRecord);
+    }
+
     private ServiceRecordResponse mapToResponse(ServiceRecord record) {
         ServiceRecordResponse response = new ServiceRecordResponse();
         response.setId(record.getId());
@@ -131,6 +160,8 @@ public class ServiceRecordService {
         response.setPlannedEndDate(record.getPlannedEndDate());
         response.setDetails(record.getDetails());
         response.setTotalCost(record.getTotalCost());
+        response.setStatus(record.getStatus());
+        response.setCompletedAt(record.getCompletedAt());
         return response;
     }
 }

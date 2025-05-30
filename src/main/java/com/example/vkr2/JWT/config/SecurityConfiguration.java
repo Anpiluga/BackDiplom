@@ -36,9 +36,10 @@ public class SecurityConfiguration {
                     System.out.println("CORS request from: " + request.getHeader("Origin"));
                     var corsConfiguration = new CorsConfiguration();
                     corsConfiguration.setAllowedOriginPatterns(List.of("*"));
-                    corsConfiguration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+                    corsConfiguration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"));
                     corsConfiguration.setAllowedHeaders(List.of("*"));
                     corsConfiguration.setAllowCredentials(true);
+                    corsConfiguration.setMaxAge(3600L); // 1 час кеширования preflight запросов
                     return corsConfiguration;
                 }))
                 .authorizeHttpRequests(request -> request
