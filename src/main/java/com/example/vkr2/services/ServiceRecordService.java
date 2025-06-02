@@ -26,6 +26,8 @@ public class ServiceRecordService {
     private final ServiceRecordRepository serviceRecordRepository;
     private final CarRepository carRepository;
 
+
+
     @Transactional
     public ServiceRecordResponse addServiceRecord(ServiceRecordRequest request) {
         logger.info("Adding service record for car ID: {}", request.getCarId());
