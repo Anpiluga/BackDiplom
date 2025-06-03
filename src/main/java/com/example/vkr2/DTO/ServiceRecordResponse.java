@@ -4,7 +4,6 @@ import com.example.vkr2.entity.ServiceRecord;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Data
@@ -23,11 +22,11 @@ public class ServiceRecordResponse {
     @Schema(description = "Текущее показание счётчика", example = "50000")
     private Long counterReading;
 
-    @Schema(description = "Дата начала работ", example = "2025-05-20")
-    private LocalDate startDate;
+    @Schema(description = "Дата и время начала работ", example = "2025-05-20T10:30:00")
+    private LocalDateTime startDateTime;
 
-    @Schema(description = "Планируемая дата окончания работ", example = "2025-05-25")
-    private LocalDate plannedEndDate;
+    @Schema(description = "Планируемая дата и время окончания работ", example = "2025-05-25T18:00:00")
+    private LocalDateTime plannedEndDateTime;
 
     @Schema(description = "Детали сервисных работ", example = "Замена масла и фильтров")
     private String details;
@@ -40,4 +39,7 @@ public class ServiceRecordResponse {
 
     @Schema(description = "Дата и время завершения работ", example = "2025-05-25T15:30:00")
     private LocalDateTime completedAt;
+
+    @Schema(description = "Дата и время создания записи", example = "2025-05-20T09:15:00")
+    private LocalDateTime createdAt;
 }

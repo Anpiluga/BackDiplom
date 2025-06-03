@@ -79,12 +79,12 @@ public class AnalyticsService {
             logger.info("Found {} service records total", allServiceRecords.size());
 
             serviceCosts = allServiceRecords.stream()
-                    .filter(record -> record.getStartDate() != null && record.getTotalCost() != null)
+                    .filter(record -> record.getStartDateTime() != null && record.getTotalCost() != null)
                     .filter(record -> {
-                        LocalDateTime recordDateTime = record.getStartDate().atStartOfDay();
+                        LocalDateTime recordDateTime = record.getStartDateTime();
                         return recordDateTime.isAfter(finalStartDate) && recordDateTime.isBefore(finalEndDate);
                     })
-                    .peek(record -> logger.debug("Including service record: {} - {} руб", record.getStartDate(), record.getTotalCost()))
+                    .peek(record -> logger.debug("Including service record: {} - {} руб", record.getStartDateTime(), record.getTotalCost()))
                     .mapToDouble(record -> record.getTotalCost())
                     .sum();
 
@@ -94,7 +94,7 @@ public class AnalyticsService {
             serviceCosts = 0;
         }
 
-        // Расходы на запчасти - теперь используем dateTime
+        // Расходы на запчасти - используем dateTime
         double sparePartsCosts = 0;
         try {
             List<com.example.vkr2.entity.SparePart> sparePartsInPeriod =
@@ -191,9 +191,9 @@ public class AnalyticsService {
             logger.info("Found {} service records for car {}", carServiceRecords.size(), carId);
 
             serviceCosts = carServiceRecords.stream()
-                    .filter(record -> record.getStartDate() != null && record.getTotalCost() != null)
+                    .filter(record -> record.getStartDateTime() != null && record.getTotalCost() != null)
                     .filter(record -> {
-                        LocalDateTime recordDateTime = record.getStartDate().atStartOfDay();
+                        LocalDateTime recordDateTime = record.getStartDateTime();
                         return recordDateTime.isAfter(finalStartDate) && recordDateTime.isBefore(finalEndDate);
                     })
                     .mapToDouble(record -> record.getTotalCost())
@@ -274,9 +274,9 @@ public class AnalyticsService {
 
                     List<com.example.vkr2.entity.ServiceRecord> monthlyServiceRecords = serviceRecordRepository.findByCarId(carId);
                     serviceCost = monthlyServiceRecords.stream()
-                            .filter(record -> record.getStartDate() != null && record.getTotalCost() != null)
+                            .filter(record -> record.getStartDateTime() != null && record.getTotalCost() != null)
                             .filter(record -> {
-                                LocalDateTime recordDateTime = record.getStartDate().atStartOfDay();
+                                LocalDateTime recordDateTime = record.getStartDateTime();
                                 return recordDateTime.isAfter(startOfMonth) && recordDateTime.isBefore(endOfMonth);
                             })
                             .mapToDouble(record -> record.getTotalCost())
@@ -301,9 +301,9 @@ public class AnalyticsService {
 
                     List<com.example.vkr2.entity.ServiceRecord> monthlyServiceRecords = serviceRecordRepository.findAll();
                     serviceCost = monthlyServiceRecords.stream()
-                            .filter(record -> record.getStartDate() != null && record.getTotalCost() != null)
+                            .filter(record -> record.getStartDateTime() != null && record.getTotalCost() != null)
                             .filter(record -> {
-                                LocalDateTime recordDateTime = record.getStartDate().atStartOfDay();
+                                LocalDateTime recordDateTime = record.getStartDateTime();
                                 return recordDateTime.isAfter(startOfMonth) && recordDateTime.isBefore(endOfMonth);
                             })
                             .mapToDouble(record -> record.getTotalCost())

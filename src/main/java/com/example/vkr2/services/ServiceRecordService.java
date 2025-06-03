@@ -15,7 +15,6 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -28,6 +27,7 @@ public class ServiceRecordService {
 
     private final ServiceRecordRepository serviceRecordRepository;
     private final CarRepository carRepository;
+    private final CounterValidationService counterValidationService;
 
     @Autowired
     @Lazy
@@ -36,27 +36,40 @@ public class ServiceRecordService {
     @Transactional
     public ServiceRecordResponse addServiceRecord(ServiceRecordRequest request) {
         logger.info("Adding service record for car ID: {}", request.getCarId());
+
         Car car = carRepository.findById(request.getCarId())
                 .orElseThrow(() -> new EntityNotFoundException("Автомобиль с ID " + request.getCarId() + " не найден"));
+
+        // ВАЛИДАЦИЯ ПОКАЗАНИЙ СЧЕТЧИКА
+        try {
+            counterValidationService.validateServiceRecordCounter(
+                    request.getCarId(),
+                    request.getCounterReading(),
+                    request.getStartDateTime()
+            );
+        } catch (IllegalArgumentException e) {
+            logger.error("Counter validation failed for car {}: {}", request.getCarId(), e.getMessage());
+            throw e;
+        }
 
         ServiceRecord serviceRecord = ServiceRecord.builder()
                 .car(car)
                 .counterReading(request.getCounterReading())
-                .startDate(request.getStartDate())
-                .plannedEndDate(request.getPlannedEndDate())
+                .startDateTime(request.getStartDateTime())
+                .plannedEndDateTime(request.getPlannedEndDateTime())
                 .details(request.getDetails())
                 .totalCost(request.getTotalCost())
-                .status(ServiceRecord.ServiceStatus.PLANNED) // Явно устанавливаем статус
+                .status(ServiceRecord.ServiceStatus.PLANNED)
+                .createdAt(LocalDateTime.now())
                 .build();
 
-        // Дополнительная проверка на случай, если builder не сработал
         if (serviceRecord.getStatus() == null) {
             serviceRecord.setStatus(ServiceRecord.ServiceStatus.PLANNED);
         }
 
         ServiceRecord savedRecord = serviceRecordRepository.save(serviceRecord);
-        logger.info("Service record added with ID: {} for car ID: {} with status: {}",
-                savedRecord.getId(), request.getCarId(), savedRecord.getStatus());
+        logger.info("Service record added with ID: {} for car ID: {} with status: {}, counter: {}",
+                savedRecord.getId(), request.getCarId(), savedRecord.getStatus(), savedRecord.getCounterReading());
 
         return mapToResponse(savedRecord);
     }
@@ -64,24 +77,38 @@ public class ServiceRecordService {
     @Transactional
     public ServiceRecordResponse updateServiceRecord(Long id, ServiceRecordRequest request) {
         logger.info("Updating service record with ID: {}", id);
+
         ServiceRecord existingRecord = serviceRecordRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Сервисная запись с ID " + id + " не найдена"));
 
         Car car = carRepository.findById(request.getCarId())
                 .orElseThrow(() -> new EntityNotFoundException("Автомобиль с ID " + request.getCarId() + " не найден"));
 
+        // ВАЛИДАЦИЯ ПОКАЗАНИЙ СЧЕТЧИКА (только если они изменились)
+        if (!existingRecord.getCounterReading().equals(request.getCounterReading()) ||
+                !existingRecord.getStartDateTime().equals(request.getStartDateTime())) {
+
+            try {
+                counterValidationService.validateServiceRecordCounter(
+                        request.getCarId(),
+                        request.getCounterReading(),
+                        request.getStartDateTime()
+                );
+            } catch (IllegalArgumentException e) {
+                logger.error("Counter validation failed during update for car {}: {}", request.getCarId(), e.getMessage());
+                throw e;
+            }
+        }
+
         existingRecord.setCar(car);
         existingRecord.setCounterReading(request.getCounterReading());
-        existingRecord.setStartDate(request.getStartDate());
-        existingRecord.setPlannedEndDate(request.getPlannedEndDate());
+        existingRecord.setStartDateTime(request.getStartDateTime());
+        existingRecord.setPlannedEndDateTime(request.getPlannedEndDateTime());
         existingRecord.setDetails(request.getDetails());
         existingRecord.setTotalCost(request.getTotalCost());
 
-        // Не изменяем статус при обычном обновлении
-        // Статус должен изменяться отдельными методами
-
         ServiceRecord updatedRecord = serviceRecordRepository.save(existingRecord);
-        logger.info("Service record updated with ID: {}", updatedRecord.getId());
+        logger.info("Service record updated with ID: {}, counter: {}", updatedRecord.getId(), updatedRecord.getCounterReading());
         return mapToResponse(updatedRecord);
     }
 
@@ -100,12 +127,12 @@ public class ServiceRecordService {
 
     @Transactional(readOnly = true)
     public List<ServiceRecordResponse> getServiceRecordsWithFilters(String search, Long carId,
-                                                                    LocalDate startDate, LocalDate endDate,
+                                                                    LocalDateTime startDateTime, LocalDateTime endDateTime,
                                                                     Double minCost, Double maxCost) {
         logger.info("Fetching service records with filters");
         try {
-            return serviceRecordRepository.findServiceRecordsWithFilters(search, carId, startDate,
-                            endDate, minCost, maxCost).stream()
+            return serviceRecordRepository.findServiceRecordsWithFilters(search, carId, startDateTime,
+                            endDateTime, minCost, maxCost).stream()
                     .map(this::mapToResponse)
                     .collect(Collectors.toList());
         } catch (Exception e) {
@@ -126,7 +153,7 @@ public class ServiceRecordService {
     public List<ServiceRecordResponse> getServiceRecordsByCarId(Long carId) {
         logger.info("Fetching service records for car ID: {}", carId);
         try {
-            return serviceRecordRepository.findByCarId(carId).stream()
+            return serviceRecordRepository.findByCarIdOrderByDateTime(carId).stream()
                     .map(this::mapToResponse)
                     .collect(Collectors.toList());
         } catch (Exception e) {
@@ -272,14 +299,14 @@ public class ServiceRecordService {
 
     // Методы для работы с датами
     @Transactional(readOnly = true)
-    public List<ServiceRecordResponse> getServiceRecordsByDateRange(LocalDate startDate, LocalDate endDate) {
-        logger.info("Fetching service records between {} and {}", startDate, endDate);
+    public List<ServiceRecordResponse> getServiceRecordsByDateTimeRange(LocalDateTime startDateTime, LocalDateTime endDateTime) {
+        logger.info("Fetching service records between {} and {}", startDateTime, endDateTime);
         try {
-            return serviceRecordRepository.findByStartDateBetween(startDate, endDate).stream()
+            return serviceRecordRepository.findByStartDateTimeBetween(startDateTime, endDateTime).stream()
                     .map(this::mapToResponse)
                     .collect(Collectors.toList());
         } catch (Exception e) {
-            logger.error("Error fetching service records by date range", e);
+            logger.error("Error fetching service records by date time range", e);
             throw new RuntimeException("Ошибка при получении сервисных записей по диапазону дат", e);
         }
     }
@@ -287,11 +314,11 @@ public class ServiceRecordService {
     @Transactional(readOnly = true)
     public List<ServiceRecordResponse> getOverdueServiceRecords() {
         logger.info("Fetching overdue service records");
-        LocalDate today = LocalDate.now();
+        LocalDateTime now = LocalDateTime.now();
         try {
             return serviceRecordRepository.findAll().stream()
-                    .filter(record -> record.getPlannedEndDate() != null &&
-                            record.getPlannedEndDate().isBefore(today) &&
+                    .filter(record -> record.getPlannedEndDateTime() != null &&
+                            record.getPlannedEndDateTime().isBefore(now) &&
                             record.getStatus() != ServiceRecord.ServiceStatus.COMPLETED &&
                             record.getStatus() != ServiceRecord.ServiceStatus.CANCELLED)
                     .map(this::mapToResponse)
@@ -310,15 +337,18 @@ public class ServiceRecordService {
 
     @Transactional(readOnly = true)
     public long countCompletedServiceRecordsByCarId(Long carId) {
-        return serviceRecordRepository.findAllCompletedByCarId(carId).size();
+        return serviceRecordRepository.countCompletedServicesByCarId(carId);
     }
 
     @Transactional(readOnly = true)
     public Double getTotalCostByCarId(Long carId) {
-        return serviceRecordRepository.findByCarId(carId).stream()
-                .filter(record -> record.getTotalCost() != null)
-                .mapToDouble(ServiceRecord::getTotalCost)
-                .sum();
+        return serviceRecordRepository.sumTotalCostByCarId(carId).orElse(0.0);
+    }
+
+    // Метод для получения информации о показаниях счетчика
+    @Transactional(readOnly = true)
+    public Object getCounterInfoForCar(Long carId) {
+        return counterValidationService.getCounterInfo(carId);
     }
 
     // Метод для принудительной проверки уведомлений после изменений
@@ -350,12 +380,13 @@ public class ServiceRecordService {
         }
 
         response.setCounterReading(record.getCounterReading());
-        response.setStartDate(record.getStartDate());
-        response.setPlannedEndDate(record.getPlannedEndDate());
+        response.setStartDateTime(record.getStartDateTime());
+        response.setPlannedEndDateTime(record.getPlannedEndDateTime());
         response.setDetails(record.getDetails());
         response.setTotalCost(record.getTotalCost());
         response.setStatus(record.getStatus() != null ? record.getStatus() : ServiceRecord.ServiceStatus.PLANNED);
         response.setCompletedAt(record.getCompletedAt());
+        response.setCreatedAt(record.getCreatedAt());
 
         return response;
     }

@@ -16,9 +16,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Collections;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/admin/service-records")
@@ -36,6 +37,9 @@ public class ServiceRecordController {
             logger.info("Добавление сервисной записи: {}", request);
             ServiceRecordResponse response = serviceRecordService.addServiceRecord(request);
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (IllegalArgumentException e) {
+            logger.error("Ошибка валидации при добавлении сервисной записи: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
         } catch (EntityNotFoundException e) {
             logger.error("Ошибка при добавлении сервисной записи - сущность не найдена: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
@@ -52,6 +56,9 @@ public class ServiceRecordController {
             logger.info("Обновление сервисной записи с ID {}: {}", id, request);
             ServiceRecordResponse response = serviceRecordService.updateServiceRecord(id, request);
             return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            logger.error("Ошибка валидации при обновлении сервисной записи: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
         } catch (EntityNotFoundException e) {
             logger.error("Ошибка при обновлении сервисной записи - сущность не найдена: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
@@ -95,14 +102,14 @@ public class ServiceRecordController {
     public ResponseEntity<List<ServiceRecordResponse>> getServiceRecordsWithFilters(
             @RequestParam(required = false) String search,
             @RequestParam(required = false) Long carId,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDateTime,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDateTime,
             @RequestParam(required = false) Double minCost,
             @RequestParam(required = false) Double maxCost) {
         try {
             logger.info("Получение сервисных записей с фильтрами");
             List<ServiceRecordResponse> records = serviceRecordService.getServiceRecordsWithFilters(
-                    search, carId, startDate, endDate, minCost, maxCost);
+                    search, carId, startDateTime, endDateTime, minCost, maxCost);
             return ResponseEntity.ok(records);
         } catch (Exception e) {
             logger.error("Ошибка при получении отфильтрованного списка сервисных записей: {}", e.getMessage(), e);
@@ -123,6 +130,23 @@ public class ServiceRecordController {
         } catch (Exception e) {
             logger.error("Внутренняя ошибка сервера при получении сервисной записи: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
+    }
+
+    @Operation(summary = "Получить информацию о показаниях счетчика для автомобиля")
+    @GetMapping("/counter-info/{carId}")
+    public ResponseEntity<Object> getCounterInfo(@PathVariable Long carId) {
+        try {
+            logger.info("Получение информации о счетчике для автомобиля ID: {}", carId);
+            Object counterInfo = serviceRecordService.getCounterInfoForCar(carId);
+            return ResponseEntity.ok(counterInfo);
+        } catch (Exception e) {
+            logger.error("Ошибка при получении информации о счетчике: {}", e.getMessage(), e);
+            return ResponseEntity.ok(Map.of(
+                    "minAllowedCounter", 0,
+                    "lastRecord", Map.of(),
+                    "totalRecords", 0
+            ));
         }
     }
 
@@ -156,6 +180,61 @@ public class ServiceRecordController {
         } catch (Exception e) {
             logger.error("Внутренняя ошибка сервера при удалении сервисной записи: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @Operation(summary = "Получить сервисные записи по автомобилю")
+    @GetMapping("/car/{carId}")
+    public ResponseEntity<List<ServiceRecordResponse>> getServiceRecordsByCarId(@PathVariable Long carId) {
+        try {
+            logger.info("Получение сервисных записей для автомобиля ID: {}", carId);
+            List<ServiceRecordResponse> records = serviceRecordService.getServiceRecordsByCarId(carId);
+            return ResponseEntity.ok(records);
+        } catch (Exception e) {
+            logger.error("Ошибка при получении сервисных записей по автомобилю: {}", e.getMessage(), e);
+            return ResponseEntity.ok(Collections.emptyList());
+        }
+    }
+
+    @Operation(summary = "Получить просроченные сервисные записи")
+    @GetMapping("/overdue")
+    public ResponseEntity<List<ServiceRecordResponse>> getOverdueServiceRecords() {
+        try {
+            logger.info("Получение просроченных сервисных записей");
+            List<ServiceRecordResponse> records = serviceRecordService.getOverdueServiceRecords();
+            return ResponseEntity.ok(records);
+        } catch (Exception e) {
+            logger.error("Ошибка при получении просроченных сервисных записей: {}", e.getMessage(), e);
+            return ResponseEntity.ok(Collections.emptyList());
+        }
+    }
+
+    @Operation(summary = "Получить статистику по сервисным записям автомобиля")
+    @GetMapping("/stats/{carId}")
+    public ResponseEntity<Map<String, Object>> getServiceRecordStats(@PathVariable Long carId) {
+        try {
+            logger.info("Получение статистики сервисных записей для автомобиля ID: {}", carId);
+
+            long totalRecords = serviceRecordService.countServiceRecordsByCarId(carId);
+            long completedRecords = serviceRecordService.countCompletedServiceRecordsByCarId(carId);
+            Double totalCost = serviceRecordService.getTotalCostByCarId(carId);
+
+            Map<String, Object> stats = Map.of(
+                    "totalRecords", totalRecords,
+                    "completedRecords", completedRecords,
+                    "totalCost", totalCost != null ? totalCost : 0.0,
+                    "carId", carId
+            );
+
+            return ResponseEntity.ok(stats);
+        } catch (Exception e) {
+            logger.error("Ошибка при получении статистики: {}", e.getMessage(), e);
+            return ResponseEntity.ok(Map.of(
+                    "totalRecords", 0,
+                    "completedRecords", 0,
+                    "totalCost", 0.0,
+                    "carId", carId
+            ));
         }
     }
 }

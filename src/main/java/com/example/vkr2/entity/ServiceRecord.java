@@ -3,7 +3,6 @@ package com.example.vkr2.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -26,11 +25,12 @@ public class ServiceRecord {
     @Column(nullable = false)
     private Long counterReading;
 
+    // Изменяем на LocalDateTime для единообразия
     @Column(nullable = false)
-    private LocalDate startDate;
+    private LocalDateTime startDateTime;
 
     @Column
-    private LocalDate plannedEndDate;
+    private LocalDateTime plannedEndDateTime;
 
     @Column(length = 2000)
     private String details;
@@ -41,7 +41,6 @@ public class ServiceRecord {
     @OneToMany(mappedBy = "serviceRecord", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<ServiceTask> serviceTasks;
 
-    // Новые поля для системы напоминаний
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default
@@ -50,15 +49,20 @@ public class ServiceRecord {
     @Column
     private LocalDateTime completedAt;
 
-    // Добавляем метод, который будет вызываться перед сохранением
+    // Добавляем поле для отслеживания создания записи
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
+
     @PrePersist
     protected void onCreate() {
         if (status == null) {
             status = ServiceStatus.PLANNED;
         }
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
     }
 
-    // Добавляем метод для установки статуса по умолчанию
     public void setDefaultStatus() {
         if (this.status == null) {
             this.status = ServiceStatus.PLANNED;

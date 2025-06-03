@@ -25,12 +25,26 @@ public class FuelEntryService {
 
     private final FuelEntryRepository fuelEntryRepository;
     private final CarRepository carRepository;
+    private final CounterValidationService counterValidationService;
 
     @Transactional
     public FuelEntryResponse addFuelEntry(FuelEntryRequest request) {
         logger.info("Adding fuel entry for car ID: {}", request.getCarId());
+
         Car car = carRepository.findById(request.getCarId())
                 .orElseThrow(() -> new EntityNotFoundException("Автомобиль с ID " + request.getCarId() + " не найден"));
+
+        // ВАЛИДАЦИЯ ПОКАЗАНИЙ СЧЕТЧИКА
+        try {
+            counterValidationService.validateFuelEntryCounter(
+                    request.getCarId(),
+                    request.getOdometerReading(),
+                    request.getDateTime()
+            );
+        } catch (IllegalArgumentException e) {
+            logger.error("Counter validation failed for fuel entry car {}: {}", request.getCarId(), e.getMessage());
+            throw e;
+        }
 
         FuelEntry fuelEntry = FuelEntry.builder()
                 .car(car)
@@ -44,18 +58,38 @@ public class FuelEntryService {
                 .build();
 
         FuelEntry savedEntry = fuelEntryRepository.save(fuelEntry);
-        logger.info("Fuel entry added with ID: {} for car ID: {}", savedEntry.getId(), request.getCarId());
+        logger.info("Fuel entry added with ID: {} for car ID: {}, counter: {}",
+                savedEntry.getId(), request.getCarId(), savedEntry.getOdometerReading());
+
         return mapToResponse(savedEntry);
     }
 
     @Transactional
     public FuelEntryResponse updateFuelEntry(Long id, FuelEntryRequest request) {
         logger.info("Updating fuel entry with ID: {}", id);
+
         FuelEntry existingEntry = fuelEntryRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Запись о заправке с ID " + id + " не найдена"));
 
         Car car = carRepository.findById(request.getCarId())
                 .orElseThrow(() -> new EntityNotFoundException("Автомобиль с ID " + request.getCarId() + " не найден"));
+
+        // ВАЛИДАЦИЯ ПОКАЗАНИЙ СЧЕТЧИКА (только если они изменились)
+        if (!existingEntry.getOdometerReading().equals(request.getOdometerReading()) ||
+                !existingEntry.getDateTime().equals(request.getDateTime())) {
+
+            try {
+                counterValidationService.validateFuelEntryCounter(
+                        request.getCarId(),
+                        request.getOdometerReading(),
+                        request.getDateTime()
+                );
+            } catch (IllegalArgumentException e) {
+                logger.error("Counter validation failed during update for fuel entry car {}: {}",
+                        request.getCarId(), e.getMessage());
+                throw e;
+            }
+        }
 
         existingEntry.setCar(car);
         existingEntry.setOdometerReading(request.getOdometerReading());
@@ -67,7 +101,9 @@ public class FuelEntryService {
         existingEntry.setDateTime(request.getDateTime());
 
         FuelEntry updatedEntry = fuelEntryRepository.save(existingEntry);
-        logger.info("Fuel entry updated with ID: {}", updatedEntry.getId());
+        logger.info("Fuel entry updated with ID: {}, counter: {}",
+                updatedEntry.getId(), updatedEntry.getOdometerReading());
+
         return mapToResponse(updatedEntry);
     }
 
@@ -117,6 +153,17 @@ public class FuelEntryService {
         }
         fuelEntryRepository.deleteById(id);
         logger.info("Fuel entry deleted with ID: {}", id);
+    }
+
+    // Методы для получения информации о показаниях счетчика
+    @Transactional(readOnly = true)
+    public Object getCounterInfoForCar(Long carId) {
+        return counterValidationService.getCounterInfo(carId);
+    }
+
+    @Transactional(readOnly = true)
+    public Long getMinimumAllowedCounter(Long carId) {
+        return counterValidationService.getMinimumAllowedCounter(carId);
     }
 
     private FuelEntryResponse mapToResponse(FuelEntry entry) {

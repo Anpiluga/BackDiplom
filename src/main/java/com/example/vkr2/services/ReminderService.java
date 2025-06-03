@@ -86,6 +86,14 @@ public class ReminderService {
                 reminders.add(reminder);
             } catch (Exception e) {
                 logger.error("Error creating reminder for car ID {}: {}", car.getId(), e.getMessage());
+                // Создаем базовое напоминание с ошибкой
+                ReminderResponse errorReminder = new ReminderResponse();
+                errorReminder.setCarId(car.getId());
+                errorReminder.setCarDetails(car.getBrand() + " " + car.getModel() + " " + car.getLicensePlate());
+                errorReminder.setCurrentOdometer(car.getOdometr());
+                errorReminder.setStatus(ReminderResponse.ReminderStatus.WARNING);
+                errorReminder.setMessage("Ошибка при расчете напоминания");
+                reminders.add(errorReminder);
             }
         }
 
@@ -161,42 +169,51 @@ public class ReminderService {
             ReminderSettings settings = settingsOpt.get();
             reminder.setServiceIntervalKm(settings.getServiceIntervalKm());
 
-            // Получаем последнее выполненное ТО
-            Optional<ServiceRecord> lastServiceOpt = serviceRecordRepository.findLastCompletedByCarId(car.getId());
+            // ИСПРАВЛЕНИЕ: Используем исправленный метод для получения последнего ТО
+            try {
+                Optional<ServiceRecord> lastServiceOpt = serviceRecordRepository.findLastCompletedByCarId(car.getId());
 
-            if (lastServiceOpt.isPresent()) {
-                ServiceRecord lastService = lastServiceOpt.get();
-                reminder.setLastServiceOdometer(lastService.getCounterReading());
-                reminder.setLastServiceDate(lastService.getCompletedAt());
+                if (lastServiceOpt.isPresent()) {
+                    ServiceRecord lastService = lastServiceOpt.get();
+                    reminder.setLastServiceOdometer(lastService.getCounterReading());
+                    reminder.setLastServiceDate(lastService.getCompletedAt());
 
-                // Рассчитываем км до следующего ТО
-                Long nextServiceOdometer = lastService.getCounterReading() + settings.getServiceIntervalKm();
-                Integer kmToNextService = (int)(nextServiceOdometer - car.getOdometr());
-                reminder.setKmToNextService(kmToNextService);
+                    // Рассчитываем км до следующего ТО
+                    Long nextServiceOdometer = lastService.getCounterReading() + settings.getServiceIntervalKm();
+                    Integer kmToNextService = (int)(nextServiceOdometer - car.getOdometr());
+                    reminder.setKmToNextService(kmToNextService);
 
-                // Определяем статус
-                if (kmToNextService < 0) {
-                    reminder.setStatus(ReminderResponse.ReminderStatus.OVERDUE);
-                    reminder.setMessage("ТО просрочено на " + Math.abs(kmToNextService) + " км!");
-                } else if (kmToNextService <= settings.getNotificationThresholdKm()) {
-                    reminder.setStatus(ReminderResponse.ReminderStatus.WARNING);
-                    reminder.setMessage("До следующего ТО осталось " + kmToNextService + " км");
+                    // Определяем статус
+                    if (kmToNextService < 0) {
+                        reminder.setStatus(ReminderResponse.ReminderStatus.OVERDUE);
+                        reminder.setMessage("ТО просрочено на " + Math.abs(kmToNextService) + " км!");
+                    } else if (kmToNextService <= settings.getNotificationThresholdKm()) {
+                        reminder.setStatus(ReminderResponse.ReminderStatus.WARNING);
+                        reminder.setMessage("До следующего ТО осталось " + kmToNextService + " км");
+                    } else {
+                        reminder.setStatus(ReminderResponse.ReminderStatus.OK);
+                        reminder.setMessage("До следующего ТО осталось " + kmToNextService + " км");
+                    }
                 } else {
-                    reminder.setStatus(ReminderResponse.ReminderStatus.OK);
-                    reminder.setMessage("До следующего ТО осталось " + kmToNextService + " км");
-                }
-            } else {
-                // Если нет выполненных ТО, рассчитываем от текущего пробега
-                Integer kmToFirstService = settings.getServiceIntervalKm() - car.getOdometr();
-                reminder.setKmToNextService(kmToFirstService);
+                    // Если нет выполненных ТО, рассчитываем от текущего пробега
+                    Integer kmToFirstService = settings.getServiceIntervalKm() - car.getOdometr();
+                    reminder.setKmToNextService(kmToFirstService);
 
-                if (kmToFirstService <= settings.getNotificationThresholdKm()) {
-                    reminder.setStatus(ReminderResponse.ReminderStatus.WARNING);
-                    reminder.setMessage("Приближается время первого ТО. Осталось " + kmToFirstService + " км");
-                } else {
-                    reminder.setStatus(ReminderResponse.ReminderStatus.OK);
-                    reminder.setMessage("До первого ТО осталось " + kmToFirstService + " км");
+                    if (kmToFirstService <= settings.getNotificationThresholdKm()) {
+                        reminder.setStatus(ReminderResponse.ReminderStatus.WARNING);
+                        reminder.setMessage("Приближается время первого ТО. Осталось " + kmToFirstService + " км");
+                    } else {
+                        reminder.setStatus(ReminderResponse.ReminderStatus.OK);
+                        reminder.setMessage("До первого ТО осталось " + kmToFirstService + " км");
+                    }
                 }
+            } catch (Exception e) {
+                logger.error("Ошибка при получении последнего сервиса для автомобиля ID {}: {}", car.getId(), e.getMessage());
+
+                // Устанавливаем базовые значения при ошибке
+                reminder.setStatus(ReminderResponse.ReminderStatus.WARNING);
+                reminder.setMessage("Ошибка при расчете напоминания о ТО");
+                reminder.setKmToNextService(0);
             }
         } else {
             // Если нет настроек напоминаний
