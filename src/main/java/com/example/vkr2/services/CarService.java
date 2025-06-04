@@ -1,20 +1,19 @@
 package com.example.vkr2.services;
 
 import com.example.vkr2.DTO.CarResponse;
-import com.example.vkr2.entity.Car;
-import com.example.vkr2.entity.CarStatus;
-import com.example.vkr2.entity.CounterType;
-import com.example.vkr2.entity.Driver;
-import com.example.vkr2.repository.CarRepository;
-import com.example.vkr2.repository.DriverRepository;
+import com.example.vkr2.entity.*;
+import com.example.vkr2.repository.*;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -25,6 +24,15 @@ public class CarService {
 
     private final CarRepository carRepository;
     private final DriverRepository driverRepository;
+    private final ReminderSettingsRepository reminderSettingsRepository;
+    private final FuelEntryRepository fuelEntryRepository;
+    private final AdditionalExpenseRepository additionalExpenseRepository;
+    private final ServiceRecordRepository serviceRecordRepository;
+    private final ServiceTaskRepository serviceTaskRepository;
+
+    @Autowired
+    @Lazy
+    private NotificationService notificationService;
 
     @Transactional
     public CarResponse addCar(Car car) {
@@ -147,20 +155,83 @@ public class CarService {
             Car car = carRepository.findById(id)
                     .orElseThrow(() -> new EntityNotFoundException("Автомобиль с ID " + id + " не найден"));
 
-            // Отвязываем водителя перед удалением автомобиля
+            // 1. Отвязываем водителя перед удалением автомобиля
             if (car.getDriver() != null) {
                 Driver driver = car.getDriver();
                 car.setDriver(null);
                 driver.setCar(null);
-                carRepository.save(car); // Сохраняем изменения перед удалением
+                carRepository.save(car); // Сохраняем изменения
                 logger.info("Driver unassigned from car ID: {} before deletion", id);
             }
 
+            // 2. Удаляем настройки напоминаний
+            try {
+                Optional<ReminderSettings> reminderSettings = reminderSettingsRepository.findByCarId(id);
+                if (reminderSettings.isPresent()) {
+                    reminderSettingsRepository.delete(reminderSettings.get());
+                    logger.info("Reminder settings deleted for car ID: {}", id);
+                }
+            } catch (Exception e) {
+                logger.error("Error deleting reminder settings for car ID {}: {}", id, e.getMessage());
+            }
+
+            // 3. Деактивируем связанные уведомления
+            try {
+                if (notificationService != null) {
+                    notificationService.deactivateNotificationsForCar(id);
+                    logger.info("Notifications deactivated for car ID: {}", id);
+                }
+            } catch (Exception e) {
+                logger.error("Error deactivating notifications for car ID {}: {}", id, e.getMessage());
+            }
+
+            // 4. Удаляем записи о заправках
+            try {
+                List<FuelEntry> fuelEntries = fuelEntryRepository.findByCarId(id);
+                if (!fuelEntries.isEmpty()) {
+                    fuelEntryRepository.deleteAll(fuelEntries);
+                    logger.info("Deleted {} fuel entries for car ID: {}", fuelEntries.size(), id);
+                }
+            } catch (Exception e) {
+                logger.error("Error deleting fuel entries for car ID {}: {}", id, e.getMessage());
+            }
+
+            // 5. Удаляем дополнительные расходы
+            try {
+                List<AdditionalExpense> additionalExpenses = additionalExpenseRepository.findByCarId(id);
+                if (!additionalExpenses.isEmpty()) {
+                    additionalExpenseRepository.deleteAll(additionalExpenses);
+                    logger.info("Deleted {} additional expenses for car ID: {}", additionalExpenses.size(), id);
+                }
+            } catch (Exception e) {
+                logger.error("Error deleting additional expenses for car ID {}: {}", id, e.getMessage());
+            }
+
+            // 6. Удаляем сервисные задачи через сервисные записи
+            try {
+                List<ServiceRecord> serviceRecords = serviceRecordRepository.findByCarId(id);
+                for (ServiceRecord serviceRecord : serviceRecords) {
+                    if (serviceRecord.getServiceTasks() != null) {
+                        serviceTaskRepository.deleteAll(serviceRecord.getServiceTasks());
+                    }
+                }
+                if (!serviceRecords.isEmpty()) {
+                    serviceRecordRepository.deleteAll(serviceRecords);
+                    logger.info("Deleted {} service records for car ID: {}", serviceRecords.size(), id);
+                }
+            } catch (Exception e) {
+                logger.error("Error deleting service records for car ID {}: {}", id, e.getMessage());
+            }
+
+            // 7. Наконец удаляем сам автомобиль
             carRepository.delete(car);
             logger.info("Car deleted with ID: {}", id);
+
+        } catch (EntityNotFoundException e) {
+            throw e;
         } catch (Exception e) {
             logger.error("Error deleting car with ID: {}", id, e);
-            throw new RuntimeException("Ошибка при удалении автомобиля", e);
+            throw new RuntimeException("Ошибка при удалении автомобиля: " + e.getMessage(), e);
         }
     }
 

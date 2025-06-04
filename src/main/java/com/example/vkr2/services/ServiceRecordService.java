@@ -68,6 +68,15 @@ public class ServiceRecordService {
         }
 
         ServiceRecord savedRecord = serviceRecordRepository.save(serviceRecord);
+
+        // ОБНОВЛЯЕМ ПРОБЕГ АВТОМОБИЛЯ, если новое значение больше текущего
+        if (request.getCounterReading() > car.getOdometr()) {
+            car.setOdometr(request.getCounterReading().intValue());
+            carRepository.save(car);
+            logger.info("Updated car odometer to {} km for car ID: {}",
+                    request.getCounterReading(), request.getCarId());
+        }
+
         logger.info("Service record added with ID: {} for car ID: {} with status: {}, counter: {}",
                 savedRecord.getId(), request.getCarId(), savedRecord.getStatus(), savedRecord.getCounterReading());
 
@@ -108,6 +117,15 @@ public class ServiceRecordService {
         existingRecord.setTotalCost(request.getTotalCost());
 
         ServiceRecord updatedRecord = serviceRecordRepository.save(existingRecord);
+
+        // ОБНОВЛЯЕМ ПРОБЕГ АВТОМОБИЛЯ, если новое значение больше текущего
+        if (request.getCounterReading() > car.getOdometr()) {
+            car.setOdometr(request.getCounterReading().intValue());
+            carRepository.save(car);
+            logger.info("Updated car odometer to {} km for car ID: {}",
+                    request.getCounterReading(), request.getCarId());
+        }
+
         logger.info("Service record updated with ID: {}, counter: {}", updatedRecord.getId(), updatedRecord.getCounterReading());
         return mapToResponse(updatedRecord);
     }

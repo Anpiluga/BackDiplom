@@ -58,6 +58,15 @@ public class FuelEntryService {
                 .build();
 
         FuelEntry savedEntry = fuelEntryRepository.save(fuelEntry);
+
+        // ОБНОВЛЯЕМ ПРОБЕГ АВТОМОБИЛЯ, если новое значение больше текущего
+        if (request.getOdometerReading() > car.getOdometr()) {
+            car.setOdometr(request.getOdometerReading().intValue());
+            carRepository.save(car);
+            logger.info("Updated car odometer to {} km for car ID: {}",
+                    request.getOdometerReading(), request.getCarId());
+        }
+
         logger.info("Fuel entry added with ID: {} for car ID: {}, counter: {}",
                 savedEntry.getId(), request.getCarId(), savedEntry.getOdometerReading());
 
@@ -101,6 +110,15 @@ public class FuelEntryService {
         existingEntry.setDateTime(request.getDateTime());
 
         FuelEntry updatedEntry = fuelEntryRepository.save(existingEntry);
+
+        // ОБНОВЛЯЕМ ПРОБЕГ АВТОМОБИЛЯ, если новое значение больше текущего
+        if (request.getOdometerReading() > car.getOdometr()) {
+            car.setOdometr(request.getOdometerReading().intValue());
+            carRepository.save(car);
+            logger.info("Updated car odometer to {} km for car ID: {}",
+                    request.getOdometerReading(), request.getCarId());
+        }
+
         logger.info("Fuel entry updated with ID: {}, counter: {}",
                 updatedEntry.getId(), updatedEntry.getOdometerReading());
 

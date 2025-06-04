@@ -3,6 +3,7 @@ package com.example.vkr2.services;
 import com.example.vkr2.entity.Car;
 import com.example.vkr2.entity.FuelEntry;
 import com.example.vkr2.entity.ServiceRecord;
+import com.example.vkr2.repository.CarRepository;
 import com.example.vkr2.repository.FuelEntryRepository;
 import com.example.vkr2.repository.ServiceRecordRepository;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +17,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -25,6 +27,7 @@ public class CounterValidationService {
 
     private final FuelEntryRepository fuelEntryRepository;
     private final ServiceRecordRepository serviceRecordRepository;
+    private final CarRepository carRepository;
 
     /**
      * Получает минимально допустимое показание счетчика для автомобиля
@@ -33,16 +36,70 @@ public class CounterValidationService {
     public Long getMinimumAllowedCounter(Long carId) {
         logger.debug("Getting minimum allowed counter for car ID: {}", carId);
 
+        // Получаем информацию об автомобиле
+        Optional<Car> carOpt = carRepository.findById(carId);
+        if (carOpt.isEmpty()) {
+            logger.warn("Car not found with ID: {}", carId);
+            return 0L;
+        }
+
+        Car car = carOpt.get();
+        Long carCurrentOdometer = car.getOdometr() != null ? car.getOdometr().longValue() : 0L;
+
         Long maxFromFuelEntries = getMaxCounterFromFuelEntries(carId);
         Long maxFromServiceRecords = getMaxCounterFromServiceRecords(carId);
 
+        // Находим максимальное значение среди:
+        // 1. Текущий пробег автомобиля
+        // 2. Максимальное значение из заправок
+        // 3. Максимальное значение из сервисных записей
         Long result = Math.max(
-                maxFromFuelEntries != null ? maxFromFuelEntries : 0L,
-                maxFromServiceRecords != null ? maxFromServiceRecords : 0L
+                carCurrentOdometer,
+                Math.max(
+                        maxFromFuelEntries != null ? maxFromFuelEntries : 0L,
+                        maxFromServiceRecords != null ? maxFromServiceRecords : 0L
+                )
         );
 
-        logger.debug("Minimum allowed counter for car ID {}: {}", carId, result);
+        logger.debug("Car ID {}: current odometer={}, max from fuel={}, max from service={}, result={}",
+                carId, carCurrentOdometer, maxFromFuelEntries, maxFromServiceRecords, result);
+
         return result;
+    }
+
+    /**
+     * Получает информацию о последних записях счетчика для автомобиля
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> getCounterInfo(Long carId) {
+        Long minAllowed = getMinimumAllowedCounter(carId);
+
+        // Получаем информацию об автомобиле
+        Optional<Car> carOpt = carRepository.findById(carId);
+        String carInfo = "Неизвестный автомобиль";
+        if (carOpt.isPresent()) {
+            Car car = carOpt.get();
+            carInfo = car.getBrand() + " " + car.getModel() + " " + car.getLicensePlate();
+        }
+
+        // Получаем последние записи
+        List<CounterRecord> allRecords = getAllCounterRecords(carId);
+        allRecords.sort(Comparator.comparing(CounterRecord::getDateTime).reversed());
+
+        CounterRecord lastRecord = allRecords.isEmpty() ? null : allRecords.get(0);
+
+        return Map.of(
+                "carInfo", carInfo,
+                "minAllowedCounter", minAllowed,
+                "lastRecord", lastRecord != null ? Map.of(
+                        "counter", lastRecord.getCounter(),
+                        "dateTime", lastRecord.getDateTime(),
+                        "type", lastRecord.getType(),
+                        "description", lastRecord.getDescription()
+                ) : Map.of(),
+                "totalRecords", allRecords.size(),
+                "message", String.format("Минимально допустимое показание счетчика: %d км", minAllowed)
+        );
     }
 
     /**
@@ -54,7 +111,8 @@ public class CounterValidationService {
 
         if (counterReading < minAllowed) {
             throw new IllegalArgumentException(
-                    String.format("Показание счетчика (%d км) не может быть меньше последнего зафиксированного значения (%d км)",
+                    String.format("Показание счетчика (%d км) не может быть меньше минимально допустимого значения (%d км). " +
+                                    "Это может быть текущий пробег автомобиля или последнее зафиксированное значение.",
                             counterReading, minAllowed)
             );
         }
@@ -72,37 +130,13 @@ public class CounterValidationService {
 
         if (counterReading < minAllowed) {
             throw new IllegalArgumentException(
-                    String.format("Показание счетчика (%d км) не может быть меньше последнего зафиксированного значения (%d км)",
+                    String.format("Показание счетчика (%d км) не может быть меньше минимально допустимого значения (%d км). " +
+                                    "Это может быть текущий пробег автомобиля или последнее зафиксированное значение.",
                             counterReading, minAllowed)
             );
         }
 
         validateCounterConsistency(carId, counterReading, dateTime, "service");
-    }
-
-    /**
-     * Получает информацию о последних записях счетчика для автомобиля
-     */
-    @Transactional(readOnly = true)
-    public Map<String, Object> getCounterInfo(Long carId) {
-        Long minAllowed = getMinimumAllowedCounter(carId);
-
-        // Получаем последние записи
-        List<CounterRecord> allRecords = getAllCounterRecords(carId);
-        allRecords.sort(Comparator.comparing(CounterRecord::getDateTime).reversed());
-
-        CounterRecord lastRecord = allRecords.isEmpty() ? null : allRecords.get(0);
-
-        return Map.of(
-                "minAllowedCounter", minAllowed,
-                "lastRecord", lastRecord != null ? Map.of(
-                        "counter", lastRecord.getCounter(),
-                        "dateTime", lastRecord.getDateTime(),
-                        "type", lastRecord.getType(),
-                        "description", lastRecord.getDescription()
-                ) : Map.of(),
-                "totalRecords", allRecords.size()
-        );
     }
 
     private Long getMaxCounterFromFuelEntries(Long carId) {
